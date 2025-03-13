@@ -1,0 +1,16 @@
+name: cori
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip=23.0
+  - nodejs=20
+  - pip:
+    - flask==3.0.2
+    - flask-cors==4.0.0
+    - openai==1.66.3
+    - python-dotenv==1.0.1
+    - requests==2.32.3
+    - pydantic==2.6.3
+    - pywin32  # For Excel integration on Windows

@@ -17,12 +17,21 @@ import {
   TechSpreadsheetLargeIcon,
   TechArrowUpIcon,
   TechMaximizeIcon,
+  TechStatusIcon,
+  TechAnalyzingIcon,
+  TechWorkingIcon,
+  TechAttachmentIcon,
+  TechImageIcon,
+  TechFileIcon,
 } from "./components/tech-icons"
+import { Message, MessageGroup } from "./types/message"
+import { sendMessageToAI } from "./lib/api"
+import { formatAIResponse, textToJSX } from "./lib/text-formatter"
 
 // Helper function to group messages by time
-const groupMessagesByTime = (messages) => {
-  const groups = []
-  let currentGroup = []
+const groupMessagesByTime = (messages: Message[]): MessageGroup[] => {
+  const groups: MessageGroup[] = []
+  let currentGroup: Message[] = []
 
   messages.forEach((message, index) => {
     if (index === 0) {
@@ -31,7 +40,7 @@ const groupMessagesByTime = (messages) => {
       // Group messages that are within 5 minutes of each other
       const prevTime = new Date(messages[index - 1].timestamp || Date.now())
       const currTime = new Date(message.timestamp || Date.now())
-      const diffInMinutes = (currTime - prevTime) / (1000 * 60)
+      const diffInMinutes = (currTime.getTime() - prevTime.getTime()) / (1000 * 60)
 
       if (diffInMinutes < 5) {
         currentGroup.push(message)
@@ -50,7 +59,7 @@ const groupMessagesByTime = (messages) => {
 }
 
 export default function ExcelAgentUI() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
       content: "Hi shreya, I can help you analyze and modify your Excel models. What would you like to work on?",
@@ -88,16 +97,18 @@ export default function ExcelAgentUI() {
 
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
-  const [thinkingStartTime, setThinkingStartTime] = useState(null)
-  const [thinkingDuration, setThinkingDuration] = useState(null)
+  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
+  const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
+  const [agentStatus, setAgentStatus] = useState<"idle" | "analyzing" | "working">("idle")
+  const [isAttaching, setIsAttaching] = useState(false)
 
   // Add state for typewriter effect
-  const [displayedText, setDisplayedText] = useState({})
-  const [activeTypingIndex, setActiveTypingIndex] = useState(null)
+  const [displayedText, setDisplayedText] = useState<Record<number, string>>({})
+  const [activeTypingIndex, setActiveTypingIndex] = useState<number | null>(null)
 
-  const textareaRef = useRef(null)
-  const scrollAreaRef = useRef(null)
-  const messageEndRef = useRef(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messageEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-resize textarea as content grows
   useEffect(() => {
@@ -139,7 +150,7 @@ export default function ExcelAgentUI() {
         if (charIndex < fullText.length) {
           setDisplayedText((prev) => ({
             ...prev,
-            [messageIndex]: fullText.substring(0, charIndex + 1),
+            [messageIndex]: formatAIResponse(fullText.substring(0, charIndex + 1)),
           }))
           charIndex++
           setTimeout(typeNextChar, typingSpeed)
@@ -162,54 +173,124 @@ export default function ExcelAgentUI() {
       if (!thinkingStartTime) {
         setThinkingStartTime(Date.now())
       }
-
-      const timer = setTimeout(() => {
-        // Calculate thinking duration
-        const duration = Math.round((Date.now() - thinkingStartTime) / 1000)
-        setThinkingDuration(duration)
-        setIsTyping(false)
-
-        // Add new message but mark it as not displayed yet so typewriter effect can start
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            content: "I'll run the sensitivity analysis on your financial model. Processing the Excel data now...",
-            timestamp: new Date().toISOString(),
-            thinkingTime: duration,
-            displayed: false, // This triggers the typewriter effect
-          },
-        ])
-      }, 3000)
-      return () => clearTimeout(timer)
+      
+      // We no longer need this timeout as we're waiting for the actual API response
+      // The typing indicator will be hidden when the response is received
     }
   }, [isTyping, thinkingStartTime])
 
-  // Update the handleSend function to reset thinking time
-  const handleSend = () => {
+  // Update the handleSend function to send messages to OpenAI
+  const handleSend = async () => {
+    console.log("handleSend called")
     if (input.trim()) {
-      setMessages([
-        ...messages,
-        {
-          role: "user",
-          content: input,
-          timestamp: new Date().toISOString(),
-          displayed: true, // User messages are displayed immediately
-        },
-      ])
+      // Create new user message
+      const userMessage: Message = {
+        role: "user",
+        content: input,
+        timestamp: new Date().toISOString(),
+        displayed: true, // User messages are displayed immediately
+      }
+      
+      console.log("User message:", userMessage)
+      
+      // Add user message to state
+      setMessages([...messages, userMessage])
       setInput("")
+      
       // Show typing indicator and reset thinking time
       setThinkingStartTime(null)
       setThinkingDuration(null)
       setIsTyping(true)
+      
+      // Update agent status to analyzing
+      setAgentStatus("analyzing")
+      
+      try {
+        console.log("Sending message to OpenAI API...")
+        // Send messages to OpenAI API
+        const aiResponse = await sendMessageToAI([...messages, userMessage])
+        console.log("Received AI response:", aiResponse)
+        
+        // When response is received, hide typing indicator
+        setIsTyping(false)
+        
+        // Update agent status based on response content
+        if (aiResponse.content.toLowerCase().includes("analyzing") || 
+            aiResponse.content.toLowerCase().includes("let me check")) {
+          setAgentStatus("analyzing")
+        } else if (aiResponse.content.toLowerCase().includes("working") || 
+                  aiResponse.content.toLowerCase().includes("updating") ||
+                  aiResponse.content.toLowerCase().includes("modifying")) {
+          setAgentStatus("working")
+        } else {
+          setAgentStatus("idle")
+        }
+        
+        // Add AI response to messages
+        setMessages((prev) => [...prev, aiResponse])
+      } catch (error) {
+        console.error("Error getting AI response:", error)
+        setIsTyping(false)
+        setAgentStatus("idle")
+        
+        // Add error message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : String(error)}`,
+            timestamp: new Date().toISOString(),
+            displayed: false,
+          },
+        ])
+      }
     }
   }
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
+  }
+  
+  // File attachment handlers
+  const handleAttachment = (type: "general" | "image" | "file") => {
+    console.log(`Attaching ${type}`)
+    setIsAttaching(true)
+    
+    // Simulate file selection process
+    setTimeout(() => {
+      // Add a message indicating file attachment
+      const attachmentMessage: Message = {
+        role: "user",
+        content: `[Attached ${type}]`,
+        timestamp: new Date().toISOString(),
+        displayed: true,
+      }
+      
+      setMessages((prev) => [...prev, attachmentMessage])
+      setIsAttaching(false)
+      
+      // Simulate AI response to attachment
+      setAgentStatus("analyzing")
+      setIsTyping(true)
+      
+      setTimeout(() => {
+        setIsTyping(false)
+        
+        // Add AI response to attachment
+        const aiResponse: Message = {
+          role: "system",
+          content: `I've received your ${type} attachment. What would you like me to do with it?`,
+          timestamp: new Date().toISOString(),
+          displayed: false,
+        }
+        
+        setMessages((prev) => [...prev, aiResponse])
+        setAgentStatus("idle")
+      }, 2000)
+    }, 1000)
   }
 
   const messageGroups = groupMessagesByTime(messages)
@@ -404,17 +485,17 @@ export default function ExcelAgentUI() {
                             <div className="pl-7">
                               {/* Apply typewriter effect for system messages that are being typed */}
                               {message.role === "system" && !message.displayed ? (
-                                <p className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
+                                <div className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
                                   <span
                                     className={`typewriter-text ${activeTypingIndex !== globalIndex ? "complete" : ""}`}
                                   >
-                                    {displayedText[globalIndex] || ""}
+                                    {textToJSX(displayedText[globalIndex] || "")}
                                   </span>
-                                </p>
+                                </div>
                               ) : (
-                                <p className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
-                                  {message.content}
-                                </p>
+                                <div className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
+                                  {textToJSX(formatAIResponse(message.content))}
+                                </div>
                               )}
                               {message.thinkingTime && (
                                 <div className="mt-1 text-[10px] text-blue-400/60 font-mono">
@@ -451,8 +532,37 @@ export default function ExcelAgentUI() {
                 </ScrollArea>
               </div>
 
+              {/* Status Bar */}
+              <div className="mt-4 mb-2">
+                <div className="flex items-center px-2 py-1.5 bg-[#1a2035]/20 backdrop-blur-sm rounded-md border border-[#ffffff0f] text-xs">
+                  {isAttaching ? (
+                    <>
+                      <TechAttachmentIcon className="mr-2 text-blue-300/90 animate-pulse" />
+                      <span className="text-blue-300/90 font-mono">Preparing attachment...</span>
+                    </>
+                  ) : agentStatus === "idle" && (
+                    <>
+                      <TechStatusIcon className="mr-2 text-blue-300/90" />
+                      <span className="text-blue-300/90 font-mono">Awaiting instructions...</span>
+                    </>
+                  )}
+                  {!isAttaching && agentStatus === "analyzing" && (
+                    <>
+                      <TechAnalyzingIcon className="mr-2 text-yellow-300/90 animate-pulse" />
+                      <span className="text-yellow-300/90 font-mono">Analyzing your request...</span>
+                    </>
+                  )}
+                  {!isAttaching && agentStatus === "working" && (
+                    <>
+                      <TechWorkingIcon className="mr-2 text-green-300/90 animate-pulse" />
+                      <span className="text-green-300/90 font-mono">Working on your Excel model...</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
               {/* Chat Input - Auto-expanding Textarea */}
-              <div className="mt-4">
+              <div className="mt-2">
                 <div className="relative">
                   <Textarea
                     ref={textareaRef}
@@ -460,7 +570,7 @@ export default function ExcelAgentUI() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Send a message..."
-                    className="bg-[#1a2035]/30 border-[#ffffff0f] pr-10 text-sm backdrop-blur-md shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] placeholder:text-gray-  pr-10 text-sm backdrop-blur-md shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] placeholder:text-gray-500 min-h-[40px] max-h-[120px] resize-none py-2 px-3 transition-all duration-300 focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] gradient-border"
+                    className="bg-[#1a2035]/30 border-[#ffffff0f] pr-10 text-sm backdrop-blur-md shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] placeholder:text-gray-500 min-h-[40px] max-h-[120px] resize-none py-2 px-3 transition-all duration-300 focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] gradient-border"
                     style={{ overflow: "hidden" }}
                   />
                   <Button
@@ -469,6 +579,40 @@ export default function ExcelAgentUI() {
                     disabled={!input.trim()}
                   >
                     <TechArrowUpIcon />
+                  </Button>
+                </div>
+                
+                {/* File Attachment Buttons */}
+                <div className="flex items-center mt-2 space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                    onClick={() => handleAttachment("general")}
+                    disabled={isAttaching || isTyping}
+                  >
+                    <TechAttachmentIcon className="mr-1.5" />
+                    <span>Attach</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                    onClick={() => handleAttachment("image")}
+                    disabled={isAttaching || isTyping}
+                  >
+                    <TechImageIcon className="mr-1.5" />
+                    <span>Image</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                    onClick={() => handleAttachment("file")}
+                    disabled={isAttaching || isTyping}
+                  >
+                    <TechFileIcon className="mr-1.5" />
+                    <span>File</span>
                   </Button>
                 </div>
               </div>
@@ -488,7 +632,7 @@ export default function ExcelAgentUI() {
                 {/* Excel Header */}
                 <div className="py-1.5 px-3 border-b border-[#ffffff0f] flex items-center justify-between bg-[#ffffff05]">
                   <div className="flex items-center gap-1.5">
-                    <TechSpreadsheetIcon className="text-blue-400 transition-all duration-300 hover:text-blue-300" />
+                    <TechSpreadsheetIcon />
                     <span className="text-xs text-gray-200/90 tracking-wide">Financial Model.xlsx</span>
                   </div>
                   <Button
