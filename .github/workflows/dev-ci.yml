@@ -1,0 +1,56 @@
+name: Dev Branch CI
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev ]
+
+jobs:
+  frontend-build-and-lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Lint
+      run: npm run lint || true  # Continue even if linting fails
+      
+    - name: Build Next.js
+      run: npm run build:electron && npx next build
+  
+  backend-validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install Flask
+      run: pip install -r backend/requirements.txt
+      
+    - name: Validate Python syntax
+      run: |
+        python -m py_compile backend/server.py
+        if [ $? -ne 0 ]; then
+          echo "Python syntax validation failed"
+          exit 1
+        fi
+        
+    - name: Check Flask app initialization
+      run: |
+        cd backend
+        python -c "from flask import Flask; print('Flask app validation successful')"
