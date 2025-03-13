@@ -1,0 +1,44 @@
+.resizable-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resizable-handle-e,
+.resizable-handle-w {
+  width: 4px;
+  cursor: ew-resize;
+}
+
+.resizable-handle-n,
+.resizable-handle-s {
+  height: 4px;
+  cursor: ns-resize;
+}
+
+.resizable-handle-e {
+  right: -2px;
+  left: auto;
+}
+
+.resizable-handle-w {
+  right: auto;
+  left: -2px;
+}
+
+.resizable-handle-n {
+  top: -2px;
+  bottom: auto;
+}
+
+.resizable-handle-s {
+  top: auto;
+  bottom: -2px;
+}
+
