@@ -8,7 +8,7 @@ interface ExcelScreenshotProps {
 }
 
 export function ExcelScreenshot({ className }: ExcelScreenshotProps) {
-  const [isExcelRunning, setIsExcelRunning] = useState(false)
+  const [isSpreadsheetRunning, setIsSpreadsheetRunning] = useState(false)
   const { 
     screenshotUrl, 
     isLoading, 
@@ -16,42 +16,42 @@ export function ExcelScreenshot({ className }: ExcelScreenshotProps) {
     startCapturing, 
     stopCapturing 
   } = useExcelScreenshot({
-    enabled: isExcelRunning,
+    enabled: isSpreadsheetRunning,
     interval: 1000 // Update every second
   })
 
-  const handleOpenExcel = async () => {
+  const handleOpenSpreadsheet = async () => {
     try {
       const response = await fetch('http://localhost:5000/open-excel')
       const data = await response.json()
       
       if (data.error) {
-        console.error('Error opening Excel:', data.error)
+        console.error('Error opening spreadsheet:', data.error)
         return
       }
       
-      setIsExcelRunning(true)
+      setIsSpreadsheetRunning(true)
     } catch (err) {
-      console.error('Failed to open Excel:', err)
+      console.error('Failed to open spreadsheet:', err)
     }
   }
 
   return (
     <div className={`flex flex-col items-center ${className}`}>
-      {!isExcelRunning ? (
+      {!isSpreadsheetRunning ? (
         <div className="flex flex-col items-center justify-center h-full p-6 text-center">
           <div className="w-16 h-16 mb-4 text-blue-400/70 opacity-70 animate-float">
             <TechSpreadsheetLargeIcon />
           </div>
-          <h3 className="text-lg font-thin mb-2 text-gray-300/90 tracking-wide text-gradient">Excel Viewer</h3>
+          <h3 className="text-lg font-thin mb-2 text-gray-300/90 tracking-wide text-gradient">Spreadsheet Viewer</h3>
           <p className="text-sm text-gray-400/80 max-w-md font-mono">
-            Click the button below to open Excel and start viewing screenshots.
+            Click the button below to open a spreadsheet and start viewing screenshots.
           </p>
           <Button 
-            onClick={handleOpenExcel}
+            onClick={handleOpenSpreadsheet}
             className="mt-6 bg-blue-600/30 hover:bg-blue-600/50 text-white backdrop-blur-sm border border-[#ffffff1a] px-4 shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(59,130,246,0.5)] hover:scale-105"
           >
-            Open Excel
+            Open Spreadsheet
           </Button>
         </div>
       ) : (
@@ -73,12 +73,12 @@ export function ExcelScreenshot({ className }: ExcelScreenshotProps) {
             // eslint-disable-next-line @next/next/no-img-element
             <img 
               src={screenshotUrl} 
-              alt="Excel Screenshot" 
+              alt="Spreadsheet Screenshot" 
               className="w-full h-full object-contain"
             />
           ) : (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-400">Waiting for Excel window...</p>
+              <p className="text-gray-400">Waiting for spreadsheet window...</p>
             </div>
           )}
           

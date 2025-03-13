@@ -131,6 +131,30 @@ The Docker configuration provides:
 
 See [Docker Configuration Guide](docker/README.docker.md) for details.
 
+## Linux Setup for Development
+
+For Linux development, you'll need to install LibreOffice Calc and the Python UNO bridge:
+
+```bash
+# Run the setup script
+cd backend
+chmod +x setup_linux.sh
+./setup_linux.sh
+```
+
+This will install:
+- LibreOffice Calc
+- Python UNO bridge
+- LibreOffice Python script provider
+- xdotool for window management
+
+Then install Python dependencies:
+
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
 ## Troubleshooting
 
 - **Socket Permission Issues**: See [Socket Troubleshooting Guide](conda/SOCKET_TROUBLESHOOTING.md)

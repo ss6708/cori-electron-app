@@ -7,5 +7,7 @@ requests==2.32.3
 # Additional dependencies for core infrastructure
 pydantic==2.6.3
 pillow==10.2.0
-# Windows-specific dependencies (required)
-pywin32==306
+# Cross-platform screenshot capture
+pyscreenshot==3.1
+# Windows-specific dependencies (required on Windows)
+pywin32==306; sys_platform == 'win32'
