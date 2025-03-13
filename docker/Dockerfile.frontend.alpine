@@ -1,0 +1,26 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install Python and build tools for node-gyp
+RUN apk add --no-cache python3 py3-pip make g++ && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies with Python path explicitly set
+ENV PYTHON=/usr/bin/python3
+RUN npm ci
+
+# Copy the rest of the application
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+
+# Command to run the application
+CMD ["npm", "start"]
