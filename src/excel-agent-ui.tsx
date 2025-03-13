@@ -18,11 +18,13 @@ import {
   TechArrowUpIcon,
   TechMaximizeIcon,
 } from "./components/tech-icons"
+import { Message, MessageGroup } from "./types/message"
+import { sendMessageToAI } from "./lib/api"
 
 // Helper function to group messages by time
-const groupMessagesByTime = (messages) => {
-  const groups = []
-  let currentGroup = []
+const groupMessagesByTime = (messages: Message[]): MessageGroup[] => {
+  const groups: MessageGroup[] = []
+  let currentGroup: Message[] = []
 
   messages.forEach((message, index) => {
     if (index === 0) {
@@ -31,7 +33,7 @@ const groupMessagesByTime = (messages) => {
       // Group messages that are within 5 minutes of each other
       const prevTime = new Date(messages[index - 1].timestamp || Date.now())
       const currTime = new Date(message.timestamp || Date.now())
-      const diffInMinutes = (currTime - prevTime) / (1000 * 60)
+      const diffInMinutes = (currTime.getTime() - prevTime.getTime()) / (1000 * 60)
 
       if (diffInMinutes < 5) {
         currentGroup.push(message)
@@ -50,7 +52,7 @@ const groupMessagesByTime = (messages) => {
 }
 
 export default function ExcelAgentUI() {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
       content: "Hi shreya, I can help you analyze and modify your Excel models. What would you like to work on?",
@@ -88,16 +90,16 @@ export default function ExcelAgentUI() {
 
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
-  const [thinkingStartTime, setThinkingStartTime] = useState(null)
-  const [thinkingDuration, setThinkingDuration] = useState(null)
+  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
+  const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
 
   // Add state for typewriter effect
-  const [displayedText, setDisplayedText] = useState({})
-  const [activeTypingIndex, setActiveTypingIndex] = useState(null)
+  const [displayedText, setDisplayedText] = useState<Record<number, string>>({})
+  const [activeTypingIndex, setActiveTypingIndex] = useState<number | null>(null)
 
-  const textareaRef = useRef(null)
-  const scrollAreaRef = useRef(null)
-  const messageEndRef = useRef(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messageEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-resize textarea as content grows
   useEffect(() => {
@@ -162,50 +164,65 @@ export default function ExcelAgentUI() {
       if (!thinkingStartTime) {
         setThinkingStartTime(Date.now())
       }
-
-      const timer = setTimeout(() => {
-        // Calculate thinking duration
-        const duration = Math.round((Date.now() - thinkingStartTime) / 1000)
-        setThinkingDuration(duration)
-        setIsTyping(false)
-
-        // Add new message but mark it as not displayed yet so typewriter effect can start
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "system",
-            content: "I'll run the sensitivity analysis on your financial model. Processing the Excel data now...",
-            timestamp: new Date().toISOString(),
-            thinkingTime: duration,
-            displayed: false, // This triggers the typewriter effect
-          },
-        ])
-      }, 3000)
-      return () => clearTimeout(timer)
+      
+      // We no longer need this timeout as we're waiting for the actual API response
+      // The typing indicator will be hidden when the response is received
     }
   }, [isTyping, thinkingStartTime])
 
-  // Update the handleSend function to reset thinking time
-  const handleSend = () => {
+  // Update the handleSend function to send messages to OpenAI
+  const handleSend = async () => {
+    console.log("handleSend called")
     if (input.trim()) {
-      setMessages([
-        ...messages,
-        {
-          role: "user",
-          content: input,
-          timestamp: new Date().toISOString(),
-          displayed: true, // User messages are displayed immediately
-        },
-      ])
+      // Create new user message
+      const userMessage: Message = {
+        role: "user",
+        content: input,
+        timestamp: new Date().toISOString(),
+        displayed: true, // User messages are displayed immediately
+      }
+      
+      console.log("User message:", userMessage)
+      
+      // Add user message to state
+      setMessages([...messages, userMessage])
       setInput("")
+      
       // Show typing indicator and reset thinking time
       setThinkingStartTime(null)
       setThinkingDuration(null)
       setIsTyping(true)
+      
+      try {
+        console.log("Sending message to OpenAI API...")
+        // Send messages to OpenAI API
+        const aiResponse = await sendMessageToAI([...messages, userMessage])
+        console.log("Received AI response:", aiResponse)
+        
+        // When response is received, hide typing indicator
+        setIsTyping(false)
+        
+        // Add AI response to messages
+        setMessages((prev) => [...prev, aiResponse])
+      } catch (error) {
+        console.error("Error getting AI response:", error)
+        setIsTyping(false)
+        
+        // Add error message
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "system",
+            content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : String(error)}`,
+            timestamp: new Date().toISOString(),
+            displayed: false,
+          },
+        ])
+      }
     }
   }
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -488,7 +505,7 @@ export default function ExcelAgentUI() {
                 {/* Excel Header */}
                 <div className="py-1.5 px-3 border-b border-[#ffffff0f] flex items-center justify-between bg-[#ffffff05]">
                   <div className="flex items-center gap-1.5">
-                    <TechSpreadsheetIcon className="text-blue-400 transition-all duration-300 hover:text-blue-300" />
+                    <TechSpreadsheetIcon />
                     <span className="text-xs text-gray-200/90 tracking-wide">Financial Model.xlsx</span>
                   </div>
                   <Button
