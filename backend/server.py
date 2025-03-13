@@ -3,6 +3,7 @@ from flask_cors import CORS
 import win32com.client
 import win32gui
 import win32process
+import pythoncom
 import time
 
 app = Flask(__name__)
@@ -11,6 +12,8 @@ CORS(app)  # Enable CORS for all routes
 def open_excel():
     try:
         print("Attempting to open Excel...")
+        # Initialize COM
+        pythoncom.CoInitialize()
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         # Wait for Excel to fully initialize
@@ -35,6 +38,8 @@ def launch_excel():
 @app.route('/get-excel-hwnd', methods=['GET'])
 def get_excel_hwnd():
     try:
+        # Initialize COM
+        pythoncom.CoInitialize()
         hwnd = win32gui.FindWindow("XLMAIN", None)
         if hwnd:
             return jsonify({"hwnd": hwnd})
