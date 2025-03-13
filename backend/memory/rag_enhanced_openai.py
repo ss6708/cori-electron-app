@@ -12,7 +12,6 @@ import time
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessage
-from openai.types.chat.chat_completion import ChatCompletionMessageParam
 
 from .models.event import Event
 from .conversation_memory import ConversationMemory
@@ -105,7 +104,7 @@ class RAGEnhancedOpenAI:
     
     def chat_completion(
         self,
-        messages: List[ChatCompletionMessageParam],
+        messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -171,7 +170,7 @@ class RAGEnhancedOpenAI:
     
     def chat_completion_with_domain_detection(
         self,
-        messages: List[ChatCompletionMessageParam],
+        messages: List[Dict[str, str]],
         model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -225,7 +224,7 @@ class RAGEnhancedOpenAI:
     
     def chat_completion_with_feedback(
         self,
-        messages: List[ChatCompletionMessageParam],
+        messages: List[Dict[str, str]],
         feedback_function: Callable[[ChatCompletion], Tuple[bool, str]],
         max_attempts: int = 3,
         model: Optional[str] = None,
@@ -291,11 +290,11 @@ class RAGEnhancedOpenAI:
     
     def _process_messages(
         self,
-        messages: List[ChatCompletionMessageParam],
+        messages: List[Dict[str, str]],
         system_prompt: Optional[str] = None,
-        rag_enabled: bool = True,
+        rag_enabled: bool = False,
         rag_query: Optional[str] = None
-    ) -> List[ChatCompletionMessageParam]:
+    ) -> List[Dict[str, str]]:
         """
         Process messages for chat completion.
         
@@ -417,7 +416,7 @@ class RAGEnhancedOpenAI:
     
     def _store_interaction(
         self,
-        messages: List[ChatCompletionMessageParam],
+        messages: List[Dict[str, str]],
         response: Union[ChatCompletion, Dict[str, Any]]
     ) -> None:
         """
@@ -472,7 +471,10 @@ class RAGEnhancedOpenAI:
     def clear_conversation_history(self) -> None:
         """Clear the conversation history."""
         if self.conversation_memory:
-            self.conversation_memory.clear()
+            # Delete all events in the session
+            session_ids = self.conversation_memory.get_session_ids()
+            for session_id in session_ids:
+                self.conversation_memory.delete_session(session_id)
     
     def set_rag_enabled(self, enabled: bool) -> None:
         """

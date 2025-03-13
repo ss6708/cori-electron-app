@@ -356,11 +356,19 @@ class TestRAGEnhancedOpenAI(unittest.TestCase):
     
     def test_clear_conversation_history(self):
         """Test clearing conversation history."""
+        # Set up mock session IDs
+        self.mock_conversation_memory.get_session_ids.return_value = ["session1", "session2"]
+        
         # Clear conversation history
         self.rag_openai.clear_conversation_history()
         
-        # Check that clear was called
-        self.mock_conversation_memory.clear.assert_called_once()
+        # Check that get_session_ids was called
+        self.mock_conversation_memory.get_session_ids.assert_called_once()
+        
+        # Check that delete_session was called for each session
+        self.assertEqual(self.mock_conversation_memory.delete_session.call_count, 2)
+        self.mock_conversation_memory.delete_session.assert_any_call("session1")
+        self.mock_conversation_memory.delete_session.assert_any_call("session2")
     
     def test_set_rag_enabled(self):
         """Test setting RAG enabled."""
