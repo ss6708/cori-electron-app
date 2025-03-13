@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  electron-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.electron
+    environment:
+      - DISPLAY=${DISPLAY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ./:/app
+      - /app/node_modules
+    network_mode: "host"
+    privileged: true
+    devices:
+      - /dev/dri:/dev/dri
