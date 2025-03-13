@@ -230,11 +230,16 @@ export default function ExcelAgentUI() {
     try {
       console.log('Launch Excel button clicked, setting loading state...');
       setExcelLoading(true)
-      // Call the IPC handler in the main process
-      // Type assertion for ipcRenderer
+      
+      // Use the exposed electronAPI instead of directly requiring electron
+      // @ts-ignore - TypeScript doesn't know about window.electronAPI
+      const electronAPI = window.electronAPI || window.require('electron').ipcRenderer;
+      
       console.log('Calling Electron IPC handler...');
-      const electron = window.require('electron') as { ipcRenderer: { invoke: (channel: string, arg: string) => Promise<{success: boolean, message: string}> } };
-      const result = await electron.ipcRenderer.invoke('embed-excel-window', 'excel-embed-target');
+      const result = electronAPI.embedExcelWindow 
+        ? await electronAPI.embedExcelWindow('excel-embed-target')
+        : await electronAPI.invoke('embed-excel-window', 'excel-embed-target');
+      
       console.log('Received result from IPC handler:', result);
       
       if (result.success) {
