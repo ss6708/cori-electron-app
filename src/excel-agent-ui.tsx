@@ -1,6 +1,15 @@
 "use client"
 
+interface Message {
+  role: string;
+  content: string;
+  timestamp: string;
+  displayed?: boolean;
+  thinkingTime?: number;
+}
+
 import { useState, useRef, useEffect } from "react"
+// Import required modules
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -14,15 +23,14 @@ import {
   TechHelpIcon,
   TechSettingsIcon,
   TechSpreadsheetIcon,
-  TechSpreadsheetLargeIcon,
   TechArrowUpIcon,
   TechMaximizeIcon,
 } from "./components/tech-icons"
 
 // Helper function to group messages by time
-const groupMessagesByTime = (messages) => {
-  const groups = []
-  let currentGroup = []
+const groupMessagesByTime = (messages: Message[]) => {
+  const groups: Message[][] = []
+  let currentGroup: Message[] = []
 
   messages.forEach((message, index) => {
     if (index === 0) {
@@ -31,7 +39,7 @@ const groupMessagesByTime = (messages) => {
       // Group messages that are within 5 minutes of each other
       const prevTime = new Date(messages[index - 1].timestamp || Date.now())
       const currTime = new Date(message.timestamp || Date.now())
-      const diffInMinutes = (currTime - prevTime) / (1000 * 60)
+      const diffInMinutes = (currTime.getTime() - prevTime.getTime()) / (1000 * 60)
 
       if (diffInMinutes < 5) {
         currentGroup.push(message)
@@ -50,7 +58,11 @@ const groupMessagesByTime = (messages) => {
 }
 
 export default function ExcelAgentUI() {
-  const [messages, setMessages] = useState([
+  // State for Excel embedding
+  const [excelEmbedded, setExcelEmbedded] = useState(false)
+  const [excelLoading, setExcelLoading] = useState(false)
+  
+  const [messages, setMessages] = useState<Message[]>([
     {
       role: "system",
       content: "Hi shreya, I can help you analyze and modify your Excel models. What would you like to work on?",
@@ -88,16 +100,17 @@ export default function ExcelAgentUI() {
 
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
-  const [thinkingStartTime, setThinkingStartTime] = useState(null)
-  const [thinkingDuration, setThinkingDuration] = useState(null)
+  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
+  // Using setThinkingDuration but not using thinkingDuration directly
+  const [, setThinkingDuration] = useState<number | null>(null)
 
   // Add state for typewriter effect
-  const [displayedText, setDisplayedText] = useState({})
-  const [activeTypingIndex, setActiveTypingIndex] = useState(null)
+  const [displayedText, setDisplayedText] = useState<Record<number, string>>({})
+  const [activeTypingIndex, setActiveTypingIndex] = useState<number | null>(null)
 
-  const textareaRef = useRef(null)
-  const scrollAreaRef = useRef(null)
-  const messageEndRef = useRef(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const messageEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-resize textarea as content grows
   useEffect(() => {
@@ -118,7 +131,7 @@ export default function ExcelAgentUI() {
   // Typewriter effect for system messages
   useEffect(() => {
     // Find the first system message that hasn't been fully displayed yet
-    const messageIndex = messages.findIndex((msg, index) => msg.role === "system" && !msg.displayed)
+    const messageIndex = messages.findIndex((msg) => msg.role === "system" && !msg.displayed)
 
     if (messageIndex !== -1) {
       const message = messages[messageIndex]
@@ -165,7 +178,7 @@ export default function ExcelAgentUI() {
 
       const timer = setTimeout(() => {
         // Calculate thinking duration
-        const duration = Math.round((Date.now() - thinkingStartTime) / 1000)
+        const duration = thinkingStartTime ? Math.round((Date.now() - thinkingStartTime) / 1000) : 1
         setThinkingDuration(duration)
         setIsTyping(false)
 
@@ -205,10 +218,31 @@ export default function ExcelAgentUI() {
     }
   }
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
+    }
+  }
+  
+  // Handler for embedding Excel window
+  const handleEmbedExcel = async () => {
+    try {
+      setExcelLoading(true)
+      // Call the IPC handler in the main process
+      // Type assertion for ipcRenderer
+      const electron = window.require('electron') as { ipcRenderer: { invoke: (channel: string, arg: string) => Promise<{success: boolean, message: string}> } };
+      const result = await electron.ipcRenderer.invoke('embed-excel-window', 'excel-embed-target');
+      
+      if (result.success) {
+        setExcelEmbedded(true);
+      } else {
+        console.error('Failed to embed Excel window:', result.message);
+      }
+    } catch (error) {
+      console.error('Error embedding Excel window:', error);
+    } finally {
+      setExcelLoading(false)
     }
   }
 
@@ -488,7 +522,7 @@ export default function ExcelAgentUI() {
                 {/* Excel Header */}
                 <div className="py-1.5 px-3 border-b border-[#ffffff0f] flex items-center justify-between bg-[#ffffff05]">
                   <div className="flex items-center gap-1.5">
-                    <TechSpreadsheetIcon className="text-blue-400 transition-all duration-300 hover:text-blue-300" />
+                    <TechSpreadsheetIcon />
                     <span className="text-xs text-gray-200/90 tracking-wide">Financial Model.xlsx</span>
                   </div>
                   <Button
@@ -500,18 +534,34 @@ export default function ExcelAgentUI() {
                   </Button>
                 </div>
 
-                {/* Empty Browser-Style Content Area */}
-                <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                  <div className="w-16 h-16 mb-4 text-blue-400/70 opacity-70 animate-float">
-                    <TechSpreadsheetLargeIcon />
-                  </div>
-                  <h3 className="text-lg font-thin mb-2 text-gray-300/90 tracking-wide text-gradient">Excel Viewer</h3>
-                  <p className="text-sm text-gray-400/80 max-w-md font-mono">
-                    This area will display your Excel model in a browser view.
-                  </p>
-                  <div className="mt-6 p-3 bg-blue-900/10 rounded-lg backdrop-blur-sm border border-blue-500/20 gradient-border transition-all duration-300 hover:bg-blue-900/20">
-                    <p className="text-xs text-blue-300/90">Ready to analyze financial data</p>
-                  </div>
+                {/* Excel Container Area */}
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center" id="excel-container">
+                  {excelEmbedded ? (
+                    // This div will be replaced with the embedded Excel window
+                    <div id="excel-embed-target" className="w-full h-full"></div>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 mb-4 text-blue-400/70 opacity-70 animate-float">
+                        <span className="text-blue-400">Excel</span>
+                      </div>
+                      <h3 className="text-lg font-thin mb-2 text-gray-300/90 tracking-wide text-gradient">Excel Viewer</h3>
+                      <p className="text-sm text-gray-400/80 max-w-md font-mono">
+                        This area will display your Excel model in a browser view.
+                      </p>
+                      {excelLoading ? (
+                        <div className="mt-6 p-3 bg-blue-900/10 rounded-lg backdrop-blur-sm border border-blue-500/20 gradient-border">
+                          <p className="text-xs text-blue-300/90">Loading Excel...</p>
+                        </div>
+                      ) : (
+                        <Button 
+                          onClick={handleEmbedExcel} 
+                          className="mt-6 p-3 bg-blue-900/10 rounded-lg backdrop-blur-sm border border-blue-500/20 gradient-border transition-all duration-300 hover:bg-blue-900/20"
+                        >
+                          <p className="text-xs text-blue-300/90">Launch Excel</p>
+                        </Button>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
