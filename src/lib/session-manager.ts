@@ -8,8 +8,8 @@ import { AgentState, AgentStateController } from "./state-controller";
 export interface SessionData {
   messages: Message[];
   agentState: AgentState;
-  stateMetadata: Record<string, any>;
-  additionalData?: Record<string, any>;
+  stateMetadata: Record<string, unknown>;
+  additionalData?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -27,7 +27,7 @@ export class SessionManager {
   saveSession(
     messages: Message[], 
     stateController: AgentStateController,
-    additionalData?: Record<string, any>
+    additionalData?: Record<string, unknown>
   ): boolean {
     try {
       const sessionData: SessionData = {

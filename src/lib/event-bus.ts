@@ -3,7 +3,7 @@
  * Provides a pub/sub mechanism for decoupling components.
  */
 
-export interface Event<T = any> {
+export interface Event<T = unknown> {
   type: string;
   data?: T;
   timestamp: string;
@@ -45,7 +45,7 @@ export class EventBus {
    * @param eventType Type of event to publish
    * @param data Optional data to include with the event
    */
-  publish<T = any>(eventType: string, data?: T): void {
+  publish<T = unknown>(eventType: string, data?: T): void {
     const event: Event<T> = {
       type: eventType,
       data,

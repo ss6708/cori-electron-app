@@ -23,13 +23,13 @@ export class StateTransitionError extends Error {
 interface StateHistoryEntry {
   state: AgentState;
   timestamp: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class AgentStateController {
   private currentState: AgentState;
   private stateHistory: StateHistoryEntry[];
-  private metadata: Record<string, any>;
+  private metadata: Record<string, unknown>;
   
   // Define allowed transitions between states
   private allowedTransitions: Record<AgentState, AgentState[]> = {
@@ -94,7 +94,7 @@ export class AgentStateController {
    * @returns True if the transition was successful
    * @throws StateTransitionError If the transition is not allowed
    */
-  setState(newState: AgentState, metadata?: Record<string, any>): boolean {
+  setState(newState: AgentState, metadata?: Record<string, unknown>): boolean {
     if (!this.canTransitionTo(newState)) {
       const errorMsg = `Cannot transition from ${this.currentState} to ${newState}`;
       console.error(errorMsg);
@@ -123,7 +123,7 @@ export class AgentStateController {
   /**
    * Get the current metadata.
    */
-  getMetadata(): Record<string, any> {
+  getMetadata(): Record<string, unknown> {
     return { ...this.metadata };
   }
   
@@ -132,7 +132,7 @@ export class AgentStateController {
    * 
    * @param metadata Metadata to update
    */
-  updateMetadata(metadata: Record<string, any>): void {
+  updateMetadata(metadata: Record<string, unknown>): void {
     this.metadata = { ...this.metadata, ...metadata };
     console.log(`Metadata updated:`, metadata);
   }
