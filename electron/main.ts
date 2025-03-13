@@ -55,36 +55,48 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     // Call backend API to open Excel and get window handle
-    const fetch = require('node-fetch');
-    const response = await fetch('http://localhost:5000/open-excel');
-    const data = await response.json();
-    
-    if (data.hwnd) {
-      const hwnd = data.hwnd;
+    try {
+      console.log('Calling Python backend to open Excel...');
+      const fetch = require('node-fetch');
+      const response = await fetch('http://localhost:5000/open-excel');
+      const data = await response.json();
+      console.log('Response from Python backend:', data);
       
-      // Create a BrowserWindow for the Excel window
-      excelWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
-        parent: mainWindow!,
-        show: false,
-      });
+      if (data.error) {
+        console.error('Error from Python backend:', data.error);
+        return { success: false, message: data.error };
+      }
       
-      // Set the Excel window as a child of the main window
-      excelWindow.setParentWindow(mainWindow!);
-      
-      // Attach the Excel window to the main window
-      const { NativeWindow } = require('@electron/remote');
-      const nativeWin = new NativeWindow({ handle: hwnd });
-      nativeWin.setParent(excelWindow);
-      
-      return { success: true, message: "Excel window embedded successfully" };
-    } else {
-      return { success: false, message: "Failed to get Excel window handle" };
+      if (data.hwnd) {
+        const hwnd = data.hwnd;
+        
+        // Create a BrowserWindow for the Excel window
+        excelWindow = new BrowserWindow({
+          width: 800,
+          height: 600,
+          parent: mainWindow!,
+          show: false,
+        });
+        
+        // Set the Excel window as a child of the main window
+        excelWindow.setParentWindow(mainWindow!);
+        
+        // Attach the Excel window to the main window
+        const { NativeWindow } = require('@electron/remote');
+        const nativeWin = new NativeWindow({ handle: hwnd });
+        nativeWin.setParent(excelWindow);
+        
+        return { success: true, message: "Excel window embedded successfully" };
+      } else {
+        return { success: false, message: "Failed to get Excel window handle" };
+      }
+    } catch (innerError) {
+      console.error('Error communicating with Python backend:', innerError);
+      return { success: false, message: "Error communicating with Python backend: " + (innerError instanceof Error ? innerError.message : String(innerError)) };
     }
   } catch (error) {
     console.error('Error embedding Excel window:', error);
-    return { success: false, message: "Error embedding Excel window" };
+    return { success: false, message: "Error embedding Excel window: " + (error instanceof Error ? error.message : String(error)) };
   }
 });
 

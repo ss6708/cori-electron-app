@@ -228,19 +228,27 @@ export default function ExcelAgentUI() {
   // Handler for embedding Excel window
   const handleEmbedExcel = async () => {
     try {
+      console.log('Launch Excel button clicked, setting loading state...');
       setExcelLoading(true)
       // Call the IPC handler in the main process
       // Type assertion for ipcRenderer
+      console.log('Calling Electron IPC handler...');
       const electron = window.require('electron') as { ipcRenderer: { invoke: (channel: string, arg: string) => Promise<{success: boolean, message: string}> } };
       const result = await electron.ipcRenderer.invoke('embed-excel-window', 'excel-embed-target');
+      console.log('Received result from IPC handler:', result);
       
       if (result.success) {
+        console.log('Excel window embedded successfully');
         setExcelEmbedded(true);
       } else {
         console.error('Failed to embed Excel window:', result.message);
+        // Show error message to user
+        alert(`Failed to launch Excel: ${result.message}`);
       }
     } catch (error) {
       console.error('Error embedding Excel window:', error);
+      // Show error message to user
+      alert(`Error launching Excel: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setExcelLoading(false)
     }

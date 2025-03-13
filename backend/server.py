@@ -1,22 +1,31 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 import win32com.client
 import win32gui
 import win32process
 import time
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 def open_excel():
     try:
+        print("Attempting to open Excel...")
         excel = win32com.client.Dispatch("Excel.Application")
         excel.Visible = True
         # Wait for Excel to fully initialize
         time.sleep(1)
         # Get Excel main window handle
         hwnd = win32gui.FindWindow("XLMAIN", None)
-        return {"message": "Excel opened successfully", "hwnd": hwnd}
+        if hwnd:
+            print(f"Excel opened successfully with window handle: {hwnd}")
+            return {"message": "Excel opened successfully", "hwnd": hwnd}
+        else:
+            print("Failed to get Excel window handle")
+            return {"error": "Failed to get Excel window handle"}
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Error opening Excel: {str(e)}")
+        return {"error": f"Error opening Excel: {str(e)}"}
 
 @app.route('/open-excel', methods=['GET'])
 def launch_excel():
