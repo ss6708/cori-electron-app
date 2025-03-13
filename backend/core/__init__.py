@@ -1,1 +1,4 @@
-# Core infrastructure module for Cori
+"""
+Core module for Cori backend.
+"""
+
