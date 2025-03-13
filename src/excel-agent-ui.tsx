@@ -100,6 +100,7 @@ export default function ExcelAgentUI() {
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
   const [agentStatus, setAgentStatus] = useState<"idle" | "analyzing" | "working">("idle")
+  const [isAttaching, setIsAttaching] = useState(false)
 
   // Add state for typewriter effect
   const [displayedText, setDisplayedText] = useState<Record<number, string>>({})
@@ -251,6 +252,45 @@ export default function ExcelAgentUI() {
       e.preventDefault()
       handleSend()
     }
+  }
+  
+  // File attachment handlers
+  const handleAttachment = (type: "general" | "image" | "file") => {
+    console.log(`Attaching ${type}`)
+    setIsAttaching(true)
+    
+    // Simulate file selection process
+    setTimeout(() => {
+      // Add a message indicating file attachment
+      const attachmentMessage: Message = {
+        role: "user",
+        content: `[Attached ${type}]`,
+        timestamp: new Date().toISOString(),
+        displayed: true,
+      }
+      
+      setMessages((prev) => [...prev, attachmentMessage])
+      setIsAttaching(false)
+      
+      // Simulate AI response to attachment
+      setAgentStatus("analyzing")
+      setIsTyping(true)
+      
+      setTimeout(() => {
+        setIsTyping(false)
+        
+        // Add AI response to attachment
+        const aiResponse: Message = {
+          role: "system",
+          content: `I've received your ${type} attachment. What would you like me to do with it?`,
+          timestamp: new Date().toISOString(),
+          displayed: false,
+        }
+        
+        setMessages((prev) => [...prev, aiResponse])
+        setAgentStatus("idle")
+      }, 2000)
+    }, 1000)
   }
 
   const messageGroups = groupMessagesByTime(messages)
@@ -495,19 +535,24 @@ export default function ExcelAgentUI() {
               {/* Status Bar */}
               <div className="mt-4 mb-2">
                 <div className="flex items-center px-2 py-1.5 bg-[#1a2035]/20 backdrop-blur-sm rounded-md border border-[#ffffff0f] text-xs">
-                  {agentStatus === "idle" && (
+                  {isAttaching ? (
+                    <>
+                      <TechAttachmentIcon className="mr-2 text-blue-300/90 animate-pulse" />
+                      <span className="text-blue-300/90 font-mono">Preparing attachment...</span>
+                    </>
+                  ) : agentStatus === "idle" && (
                     <>
                       <TechStatusIcon className="mr-2 text-blue-300/90" />
                       <span className="text-blue-300/90 font-mono">Awaiting instructions...</span>
                     </>
                   )}
-                  {agentStatus === "analyzing" && (
+                  {!isAttaching && agentStatus === "analyzing" && (
                     <>
                       <TechAnalyzingIcon className="mr-2 text-yellow-300/90 animate-pulse" />
                       <span className="text-yellow-300/90 font-mono">Analyzing your request...</span>
                     </>
                   )}
-                  {agentStatus === "working" && (
+                  {!isAttaching && agentStatus === "working" && (
                     <>
                       <TechWorkingIcon className="mr-2 text-green-300/90 animate-pulse" />
                       <span className="text-green-300/90 font-mono">Working on your Excel model...</span>
@@ -543,6 +588,8 @@ export default function ExcelAgentUI() {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                    onClick={() => handleAttachment("general")}
+                    disabled={isAttaching || isTyping}
                   >
                     <TechAttachmentIcon className="mr-1.5" />
                     <span>Attach</span>
@@ -551,6 +598,8 @@ export default function ExcelAgentUI() {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                    onClick={() => handleAttachment("image")}
+                    disabled={isAttaching || isTyping}
                   >
                     <TechImageIcon className="mr-1.5" />
                     <span>Image</span>
@@ -559,6 +608,8 @@ export default function ExcelAgentUI() {
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                    onClick={() => handleAttachment("file")}
+                    disabled={isAttaching || isTyping}
                   >
                     <TechFileIcon className="mr-1.5" />
                     <span>File</span>
