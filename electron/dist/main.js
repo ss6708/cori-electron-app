@@ -7,6 +7,16 @@ const electron_1 = require("electron");
 const child_process_1 = require("child_process");
 const path_1 = __importDefault(require("path"));
 const main_1 = require("@electron/remote/main");
+const os_1 = __importDefault(require("os"));
+// Win32 API constants
+const GWL_STYLE = -16;
+const WS_POPUP = 0x80000000;
+const WS_CHILD = 0x40000000;
+const SW_SHOW = 5;
+const HWND_TOP = 0;
+const SWP_NOMOVE = 0x0002;
+const SWP_NOSIZE = 0x0001;
+const SWP_SHOWWINDOW = 0x0040;
 let mainWindow = null;
 let excelWindow = null;
 // Get absolute path of the backend server script
@@ -68,7 +78,7 @@ electron_1.ipcMain.handle('embed-excel-window', async (event, targetElementId) =
             if (data.hwnd) {
                 // Ensure hwnd is a number
                 const hwnd = parseInt(String(data.hwnd), 10);
-                console.log(`Valid window handle received: ${hwnd}`);
+                console.log(`Window handle received: ${hwnd} (Mock: ${data.is_mock === true})`);
                 // Create a BrowserWindow for the Excel window
                 excelWindow = new electron_1.BrowserWindow({
                     width: 800,
@@ -78,26 +88,51 @@ electron_1.ipcMain.handle('embed-excel-window', async (event, targetElementId) =
                 });
                 // Set the Excel window as a child of the main window
                 excelWindow.setParentWindow(mainWindow);
-                try {
-                    // Attach the Excel window to the main window
-                    // Import the entire remote module
-                    const remote = require('@electron/remote/main');
-                    console.log('Remote module loaded successfully');
-                    // Use the correct approach to set the parent window
-                    console.log('Setting Excel window as child of main window');
-                    // Use alternative approach with setParent directly
-                    // Use win32 APIs to set parent window
-                    const win32 = require('win32-api');
-                    const User32 = win32.User32;
-                    const user32 = User32.load();
-                    // Set Excel window as child of Electron window
-                    const result = user32.SetParent(hwnd, excelWindow.getNativeWindowHandle());
-                    console.log('SetParent result:', result);
-                    return { success: true, message: "Excel window embedded successfully" };
+                // Check if we're on Windows and not using a mock handle
+                if (os_1.default.platform() === 'win32' && !data.is_mock) {
+                    try {
+                        // Use win32 APIs to set parent window (Windows only)
+                        const win32 = require('win32-api');
+                        const User32 = win32.User32;
+                        const user32 = User32.load();
+                        // Set Excel window as child of Electron window
+                        // Convert Uint8Array to number using Buffer
+                        const nativeHandle = excelWindow.getNativeWindowHandle();
+                        const handleBuffer = Buffer.from(nativeHandle);
+                        const handleValue = handleBuffer.readInt32LE(0);
+                        console.log('Native handle converted:', handleValue);
+                        // Get current window style
+                        const currentStyle = user32.GetWindowLongPtrA(hwnd, GWL_STYLE);
+                        console.log('Current window style:', currentStyle);
+                        // Modify window style (remove WS_POPUP, add WS_CHILD)
+                        const newStyle = (currentStyle & ~WS_POPUP) | WS_CHILD;
+                        console.log('New window style:', newStyle);
+                        // Set new window style
+                        const styleResult = user32.SetWindowLongPtrA(hwnd, GWL_STYLE, newStyle);
+                        console.log('SetWindowLongPtr result:', styleResult);
+                        const result = user32.SetParent(hwnd, handleValue);
+                        console.log('SetParent result:', result);
+                        // Show window
+                        const showResult = user32.ShowWindow(hwnd, SW_SHOW);
+                        console.log('ShowWindow result:', showResult);
+                        // Set window position and z-order
+                        const posResult = user32.SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                        console.log('SetWindowPos result:', posResult);
+                        return { success: true, message: "Excel window embedded successfully" };
+                    }
+                    catch (attachError) {
+                        console.error('Error attaching Excel window:', attachError);
+                        return { success: false, message: `Error attaching Excel window: ${attachError instanceof Error ? attachError.message : String(attachError)}` };
+                    }
                 }
-                catch (attachError) {
-                    console.error('Error attaching Excel window:', attachError);
-                    return { success: false, message: `Error attaching Excel window: ${attachError instanceof Error ? attachError.message : String(attachError)}` };
+                else {
+                    // For non-Windows or mock handles, just show a message
+                    console.log('Using mock Excel window or non-Windows platform');
+                    return {
+                        success: true,
+                        message: "Mock Excel window created (Excel embedding only fully supported on Windows)",
+                        is_mock: true
+                    };
                 }
             }
             else {

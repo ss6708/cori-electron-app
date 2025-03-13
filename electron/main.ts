@@ -4,6 +4,16 @@ import path from 'path';
 import { initialize, enable } from '@electron/remote/main';
 import os from 'os';
 
+// Win32 API constants
+const GWL_STYLE = -16;
+const WS_POPUP = 0x80000000;
+const WS_CHILD = 0x40000000;
+const SW_SHOW = 5;
+const HWND_TOP = 0;
+const SWP_NOMOVE = 0x0002;
+const SWP_NOSIZE = 0x0001;
+const SWP_SHOWWINDOW = 0x0040;
+
 let mainWindow: BrowserWindow | null = null;
 let excelWindow: BrowserWindow | null = null;
 
@@ -104,8 +114,33 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
             const handleValue = handleBuffer.readInt32LE(0);
             console.log('Native handle converted:', handleValue);
             
+            // Get current window style
+            const currentStyle = user32.GetWindowLongPtrA(hwnd, GWL_STYLE);
+            console.log('Current window style:', currentStyle);
+            
+            // Modify window style (remove WS_POPUP, add WS_CHILD)
+            const newStyle = (currentStyle & ~WS_POPUP) | WS_CHILD;
+            console.log('New window style:', newStyle);
+            
+            // Set new window style
+            const styleResult = user32.SetWindowLongPtrA(hwnd, GWL_STYLE, newStyle);
+            console.log('SetWindowLongPtr result:', styleResult);
+            
             const result = user32.SetParent(hwnd, handleValue);
             console.log('SetParent result:', result);
+            
+            // Show window
+            const showResult = user32.ShowWindow(hwnd, SW_SHOW);
+            console.log('ShowWindow result:', showResult);
+            
+            // Set window position and z-order
+            const posResult = user32.SetWindowPos(
+              hwnd, 
+              HWND_TOP, 
+              0, 0, 0, 0, 
+              SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW
+            );
+            console.log('SetWindowPos result:', posResult);
             
             return { success: true, message: "Excel window embedded successfully" };
           } catch (attachError) {
