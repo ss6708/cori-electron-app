@@ -21,20 +21,15 @@ excel_app = None
 
 def open_excel():
     """
-    Open Excel application if on Windows, otherwise return a mock response.
-    This is a placeholder function that will be properly implemented on Windows.
+    Open Excel application on Windows.
     """
     global excel_app
     try:
-        if platform.system() == "Windows":
-            # Import win32com only on Windows
-            import win32com.client
-            excel_app = win32com.client.Dispatch("Excel.Application")
-            excel_app.Visible = True
-            return {"message": "Excel opened successfully"}
-        else:
-            # Mock response for non-Windows platforms
-            return {"message": "Excel would be opened (mock response - not on Windows)"}
+        # Import win32com for Windows
+        import win32com.client
+        excel_app = win32com.client.Dispatch("Excel.Application")
+        excel_app.Visible = True
+        return {"message": "Excel opened successfully"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -67,28 +62,14 @@ def chat():
 
 def capture_excel_screenshot():
     """
-    Capture a screenshot of the Excel window if running on Windows.
+    Capture a screenshot of the Excel window on Windows.
     Returns a tuple of (image_bytes, error_message).
     """
     try:
         if not excel_app:
             return None, "Excel application not running"
             
-        if platform.system() != "Windows":
-            # Create a mock image for non-Windows platforms
-            from PIL import Image, ImageDraw
-            img = Image.new('RGB', (800, 600), color=(25, 32, 53))
-            d = ImageDraw.Draw(img)
-            d.text((50, 50), "Excel Screenshot Simulation\n(Not running on Windows)", fill=(200, 200, 200))
-            d.rectangle([(20, 20), (780, 580)], outline=(59, 130, 246), width=2)
-            
-            # Save image to bytes
-            img_byte_arr = io.BytesIO()
-            img.save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            return img_byte_arr, None
-            
-        # Windows-specific screenshot code
+        # Windows screenshot code
         import win32gui
         import win32ui
         import win32con
@@ -154,4 +135,6 @@ def get_excel_screenshot():
     return send_file(img_bytes, mimetype='image/png')
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    # Use 0.0.0.0 to allow connections from any IP address
+    # This fixes socket permission issues on Windows
+    app.run(host='0.0.0.0', port=5000, debug=True)

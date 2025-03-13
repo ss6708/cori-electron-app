@@ -4,6 +4,8 @@ flask-cors==5.0.1
 openai==1.66.3
 python-dotenv==1.0.1
 requests==2.32.3
+# Additional dependencies for core infrastructure
+pydantic==2.6.3
 pillow==10.2.0
-# pywin32 is Windows-specific and not needed for CI validation
-# pywin32==306
+# Windows-specific dependencies (required)
+pywin32==306
