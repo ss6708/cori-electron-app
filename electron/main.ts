@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { exec } from 'child_process';
 import path from 'path';
 import { initialize, enable } from '@electron/remote/main';
+import os from 'os';
 
 let mainWindow: BrowserWindow | null = null;
 let excelWindow: BrowserWindow | null = null;
@@ -75,7 +76,7 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
       if (data.hwnd) {
         // Ensure hwnd is a number
         const hwnd = parseInt(String(data.hwnd), 10);
-        console.log(`Valid window handle received: ${hwnd}`);
+        console.log(`Window handle received: ${hwnd} (Mock: ${data.is_mock === true})`);
         
         // Create a BrowserWindow for the Excel window
         excelWindow = new BrowserWindow({
@@ -88,29 +89,31 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
         // Set the Excel window as a child of the main window
         excelWindow.setParentWindow(mainWindow!);
         
-        try {
-          // Attach the Excel window to the main window
-          // Import the entire remote module
-          const remote = require('@electron/remote/main');
-          console.log('Remote module loaded successfully');
-          
-          // Use the correct approach to set the parent window
-          console.log('Setting Excel window as child of main window');
-          // Use alternative approach with setParent directly
-          
-          // Use win32 APIs to set parent window
-          const win32 = require('win32-api');
-          const User32 = win32.User32;
-          const user32 = User32.load();
-          
-          // Set Excel window as child of Electron window
-          const result = user32.SetParent(hwnd, excelWindow.getNativeWindowHandle());
-          console.log('SetParent result:', result);
-          
-          return { success: true, message: "Excel window embedded successfully" };
-        } catch (attachError) {
-          console.error('Error attaching Excel window:', attachError);
-          return { success: false, message: `Error attaching Excel window: ${attachError instanceof Error ? attachError.message : String(attachError)}` };
+        // Check if we're on Windows and not using a mock handle
+        if (os.platform() === 'win32' && !data.is_mock) {
+          try {
+            // Use win32 APIs to set parent window (Windows only)
+            const win32 = require('win32-api');
+            const User32 = win32.User32;
+            const user32 = User32.load();
+            
+            // Set Excel window as child of Electron window
+            const result = user32.SetParent(hwnd, excelWindow.getNativeWindowHandle());
+            console.log('SetParent result:', result);
+            
+            return { success: true, message: "Excel window embedded successfully" };
+          } catch (attachError) {
+            console.error('Error attaching Excel window:', attachError);
+            return { success: false, message: `Error attaching Excel window: ${attachError instanceof Error ? attachError.message : String(attachError)}` };
+          }
+        } else {
+          // For non-Windows or mock handles, just show a message
+          console.log('Using mock Excel window or non-Windows platform');
+          return { 
+            success: true, 
+            message: "Mock Excel window created (Excel embedding only fully supported on Windows)",
+            is_mock: true
+          };
         }
       } else {
         return { success: false, message: "Failed to get Excel window handle" };

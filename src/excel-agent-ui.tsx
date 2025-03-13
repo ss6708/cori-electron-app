@@ -245,6 +245,18 @@ export default function ExcelAgentUI() {
       if (result.success) {
         console.log('Excel window embedded successfully');
         setExcelEmbedded(true);
+        
+        // If it's a mock Excel window, show a message to the user
+        if (result.is_mock) {
+          alert("Note: You're using a mock Excel window. Full Excel embedding is only supported on Windows.");
+          // Show the mock Excel message overlay
+          setTimeout(() => {
+            const mockMessage = document.getElementById('mock-excel-message');
+            if (mockMessage) {
+              mockMessage.style.display = 'flex';
+            }
+          }, 500);
+        }
       } else {
         console.error('Failed to embed Excel window:', result.message);
         // Show error message to user
@@ -551,7 +563,16 @@ export default function ExcelAgentUI() {
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center" id="excel-container">
                   {excelEmbedded ? (
                     // This div will be replaced with the embedded Excel window
-                    <div id="excel-embed-target" className="w-full h-full"></div>
+                    <div id="excel-embed-target" className="w-full h-full relative">
+                      {/* If we're using a mock Excel window, show an overlay message */}
+                      <div id="mock-excel-message" className="absolute inset-0 flex items-center justify-center bg-blue-900/20 backdrop-blur-sm" style={{display: 'none'}}>
+                        <div className="p-4 bg-blue-900/40 rounded-lg border border-blue-500/30">
+                          <p className="text-sm text-blue-200">
+                            Mock Excel view (full Excel embedding only available on Windows)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <div className="w-16 h-16 mb-4 text-blue-400/70 opacity-70 animate-float">
@@ -560,6 +581,13 @@ export default function ExcelAgentUI() {
                       <h3 className="text-lg font-thin mb-2 text-gray-300/90 tracking-wide text-gradient">Excel Viewer</h3>
                       <p className="text-sm text-gray-400/80 max-w-md font-mono">
                         This area will display your Excel model in a browser view.
+                        {typeof window !== 'undefined' && 
+                         window.navigator && 
+                         !window.navigator.userAgent.includes('Windows') && (
+                          <span className="block mt-2 text-yellow-400/80">
+                            Note: Full Excel embedding is only supported on Windows.
+                          </span>
+                        )}
                       </p>
                       {excelLoading ? (
                         <div className="mt-6 p-3 bg-blue-900/10 rounded-lg backdrop-blur-sm border border-blue-500/20 gradient-border">
