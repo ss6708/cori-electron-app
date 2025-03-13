@@ -98,7 +98,13 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
             const user32 = User32.load();
             
             // Set Excel window as child of Electron window
-            const result = user32.SetParent(hwnd, excelWindow.getNativeWindowHandle());
+            // Convert Uint8Array to number using Buffer
+            const nativeHandle = excelWindow.getNativeWindowHandle();
+            const handleBuffer = Buffer.from(nativeHandle);
+            const handleValue = handleBuffer.readInt32LE(0);
+            console.log('Native handle converted:', handleValue);
+            
+            const result = user32.SetParent(hwnd, handleValue);
             console.log('SetParent result:', result);
             
             return { success: true, message: "Excel window embedded successfully" };
