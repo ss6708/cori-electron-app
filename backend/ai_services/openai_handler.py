@@ -3,7 +3,6 @@ import time
 from typing import List, Dict, Any, Optional
 from openai import OpenAI
 import sys
-import os
 
 # Add the parent directory to sys.path to allow absolute imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

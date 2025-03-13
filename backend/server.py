@@ -2,8 +2,12 @@ from flask import Flask, jsonify, request
 import os
 import platform
 from flask_cors import CORS
+from dotenv import load_dotenv
 from ai_services import OpenAIHandler
 from models import Message
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
