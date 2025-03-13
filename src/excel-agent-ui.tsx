@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable"
+import { ExcelScreenshot } from "./components/excel-screenshot"
 import {
   TechHomeIcon,
   TechPlusIcon,
@@ -14,7 +15,6 @@ import {
   TechHelpIcon,
   TechSettingsIcon,
   TechSpreadsheetIcon,
-  TechSpreadsheetLargeIcon,
   TechArrowUpIcon,
   TechMaximizeIcon,
 } from "./components/tech-icons"
@@ -500,18 +500,9 @@ export default function ExcelAgentUI() {
                   </Button>
                 </div>
 
-                {/* Empty Browser-Style Content Area */}
+                {/* Excel Content Area */}
                 <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-                  <div className="w-16 h-16 mb-4 text-blue-400/70 opacity-70 animate-float">
-                    <TechSpreadsheetLargeIcon />
-                  </div>
-                  <h3 className="text-lg font-thin mb-2 text-gray-300/90 tracking-wide text-gradient">Excel Viewer</h3>
-                  <p className="text-sm text-gray-400/80 max-w-md font-mono">
-                    This area will display your Excel model in a browser view.
-                  </p>
-                  <div className="mt-6 p-3 bg-blue-900/10 rounded-lg backdrop-blur-sm border border-blue-500/20 gradient-border transition-all duration-300 hover:bg-blue-900/20">
-                    <p className="text-xs text-blue-300/90">Ready to analyze financial data</p>
-                  </div>
+                  <ExcelScreenshot className="w-full h-full" />
                 </div>
               </div>
             </div>
