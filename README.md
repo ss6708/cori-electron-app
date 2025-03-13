@@ -1,15 +1,54 @@
 # CORI
 
-Cori is the best financial modeller in the world for the most complex transactions. 
+Cori is the best financial modeller in the world for the most complex transactions.
 
-# Stack
+## Project Overview
 
-Electron
-Next.js
-Python server
+This is an Electron desktop application with a Next.js frontend and a Python backend server. The project aims to provide a powerful financial modelling tool with Excel integration capabilities.
 
+### Current Status
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+The project is in early development stages with the foundational architecture set up. Key components like the Electron implementation and Python backend are referenced but not fully implemented yet.
+
+## Tech Stack
+
+- **Frontend**: Next.js 15 (pre-release) with React 19 (pre-release)
+- **UI Components**: Radix UI component library
+- **Styling**: Tailwind CSS 4
+- **Desktop Wrapper**: Electron
+- **Backend**: Python server (planned)
+- **Excel Integration**: Using winax for Windows COM automation
+
+## Project Structure
+
+```
+cori-electron-app/
+├── public/               # Static assets
+│   ├── file.svg          # File icon
+│   ├── globe.svg         # Globe icon
+│   ├── next.svg          # Next.js logo
+│   ├── vercel.svg        # Vercel logo
+│   └── window.svg        # Window icon
+├── src/                  # Source code
+│   └── app/              # Next.js app directory
+│       ├── globals.css   # Global styles
+│       ├── layout.tsx    # Root layout component
+│       └── page.tsx      # Main page component
+├── .gitignore            # Git ignore rules
+├── eslint.config.mjs     # ESLint configuration
+├── next.config.ts        # Next.js configuration
+├── package.json          # Project dependencies and scripts
+├── postcss.config.mjs    # PostCSS configuration for Tailwind
+└── tsconfig.json         # TypeScript configuration
+```
+
+## Development Status
+
+- **Implemented**: Basic Next.js application structure with Tailwind CSS styling
+- **In Progress**: 
+  - Electron integration (referenced in package.json but not implemented)
+  - Excel Agent UI (referenced in page.tsx but not implemented)
+  - Python backend server (mentioned in README but not implemented)
 
 ## Getting Started
 
