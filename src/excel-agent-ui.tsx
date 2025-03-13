@@ -20,6 +20,7 @@ import {
 } from "./components/tech-icons"
 import { Message, MessageGroup } from "./types/message"
 import { sendMessageToAI } from "./lib/api"
+import { formatAIResponse, textToJSX } from "./lib/text-formatter"
 
 // Helper function to group messages by time
 const groupMessagesByTime = (messages: Message[]): MessageGroup[] => {
@@ -141,7 +142,7 @@ export default function ExcelAgentUI() {
         if (charIndex < fullText.length) {
           setDisplayedText((prev) => ({
             ...prev,
-            [messageIndex]: fullText.substring(0, charIndex + 1),
+            [messageIndex]: formatAIResponse(fullText.substring(0, charIndex + 1)),
           }))
           charIndex++
           setTimeout(typeNextChar, typingSpeed)
@@ -421,17 +422,17 @@ export default function ExcelAgentUI() {
                             <div className="pl-7">
                               {/* Apply typewriter effect for system messages that are being typed */}
                               {message.role === "system" && !message.displayed ? (
-                                <p className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
+                                <div className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
                                   <span
                                     className={`typewriter-text ${activeTypingIndex !== globalIndex ? "complete" : ""}`}
                                   >
-                                    {displayedText[globalIndex] || ""}
+                                    {textToJSX(displayedText[globalIndex] || "")}
                                   </span>
-                                </p>
+                                </div>
                               ) : (
-                                <p className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
-                                  {message.content}
-                                </p>
+                                <div className="text-xs text-gray-200/90 leading-relaxed font-mono font-normal tracking-tight">
+                                  {textToJSX(formatAIResponse(message.content))}
+                                </div>
                               )}
                               {message.thinkingTime && (
                                 <div className="mt-1 text-[10px] text-blue-400/60 font-mono">
