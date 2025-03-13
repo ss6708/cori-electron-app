@@ -11,6 +11,7 @@ import logging
 import uuid
 from datetime import datetime
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -183,10 +184,13 @@ class SessionManager:
                 "messages": messages_data,
                 "state": state_data
             }
+
         except Exception as e:
             logger.error(f"Error loading session: {e}")
             return None
     
+
+
     def delete_session(self, session_id: str) -> bool:
         """
         Delete a session.
@@ -220,6 +224,7 @@ class SessionManager:
             logger.error(f"Error deleting session: {e}")
             return False
     
+
     def list_sessions(self) -> List[Dict[str, Any]]:
         """
         List all sessions.

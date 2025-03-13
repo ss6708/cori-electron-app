@@ -23,17 +23,30 @@ The project is in early development stages with the foundational architecture se
 
 ```
 cori-electron-app/
+├── backend/              # Python backend server
+│   ├── ai_services/      # OpenAI integration
+│   ├── core/             # Core infrastructure components
+│   ├── models/           # Data models
+│   ├── requirements.txt  # Python dependencies
+│   └── server.py         # Flask server
+├── conda/                # Conda environment setup
+│   ├── environment.yml   # Conda environment definition
+│   ├── WINDOWS_SETUP.md  # Windows setup guide
+│   └── SOCKET_TROUBLESHOOTING.md # Socket troubleshooting
+├── docker/               # Docker configuration
+│   ├── Dockerfile.*      # Various Dockerfiles
+│   └── docker-compose.*  # Docker Compose configurations
 ├── public/               # Static assets
 │   ├── file.svg          # File icon
 │   ├── globe.svg         # Globe icon
 │   ├── next.svg          # Next.js logo
 │   ├── vercel.svg        # Vercel logo
 │   └── window.svg        # Window icon
-├── src/                  # Source code
-│   └── app/              # Next.js app directory
-│       ├── globals.css   # Global styles
-│       ├── layout.tsx    # Root layout component
-│       └── page.tsx      # Main page component
+├── src/                  # Frontend source code
+│   ├── app/              # Next.js app directory
+│   ├── lib/              # Shared libraries
+│   └── components/       # React components
+├── .env.example          # Example environment variables
 ├── .gitignore            # Git ignore rules
 ├── eslint.config.mjs     # ESLint configuration
 ├── next.config.ts        # Next.js configuration
@@ -44,15 +57,41 @@ cori-electron-app/
 
 ## Development Status
 
-- **Implemented**: Basic Next.js application structure with Tailwind CSS styling
+- **Implemented**: 
+  - Basic Next.js application structure with Tailwind CSS styling
+  - Python Flask backend server with OpenAI integration
+  - Core infrastructure components (event system, state management, session persistence)
+  - Conda environment setup for Windows with Excel integration
+  - Docker configuration for development without Excel dependencies
+
 - **In Progress**: 
-  - Electron integration (referenced in package.json but not implemented)
-  - Excel Agent UI (referenced in page.tsx but not implemented)
-  - Python backend server (mentioned in README but not implemented)
+  - Electron integration refinement
+  - Excel Agent UI enhancements
+  - RAG system for specialized knowledge
 
 ## Getting Started
 
-First, run the development server:
+### Windows Setup with Conda (Recommended for Excel Integration)
+
+For Windows users who need Excel integration, we recommend using the Conda environment:
+
+1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
+2. Create and activate the conda environment:
+   ```bash
+   conda env create -f conda/environment.yml
+   conda activate cori
+   ```
+3. Configure your OpenAI API key in `.env`
+4. Run the application:
+   ```bash
+   npm run dev
+   ```
+
+For detailed instructions, see [Windows Setup Guide](conda/WINDOWS_SETUP.md).
+
+### Standard Setup
+
+If you're not using Windows or don't need Excel integration, you can use the standard setup:
 
 ```bash
 npm run dev
@@ -70,17 +109,30 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Environment Setup Options
 
-To learn more about Next.js, take a look at the following resources:
+### 1. Conda Environment (Recommended for Windows with Excel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The Conda environment provides:
+- Isolated Python dependencies to avoid conflicts
+- Access to Excel through win32com on Windows
+- Consistent development environment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+See [Conda Environment Guide](conda/CONDA_ENVIRONMENT_GUIDE.md) for details.
 
-## Deploy on Vercel
+### 2. Docker Setup (For Development Without Excel)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The Docker configuration provides:
+- Completely isolated environment
+- Consistent development experience across platforms
+- Support for both backend and frontend
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Note:** Docker cannot access Excel through win32com since containers run in a Linux environment.
+
+See [Docker Configuration Guide](docker/README.docker.md) for details.
+
+## Troubleshooting
+
+- **Socket Permission Issues**: See [Socket Troubleshooting Guide](conda/SOCKET_TROUBLESHOOTING.md)
+- **Excel Integration Issues**: See [Windows Setup Guide](conda/WINDOWS_SETUP.md)
+- **Docker Issues**: See [Docker Troubleshooting Guide](docker/docker-troubleshooting.md)

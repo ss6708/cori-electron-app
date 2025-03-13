@@ -17,6 +17,7 @@ from backend.core.event_system import event_bus, Event
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class AgentState(Enum):
     """
     Enum for agent states.

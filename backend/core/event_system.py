@@ -9,6 +9,7 @@ import logging
 import uuid
 from datetime import datetime
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ class Event:
         )
         event.id = data.get("id", str(uuid.uuid4()))
         event.timestamp = data.get("timestamp", datetime.now().isoformat())
+
         return event
 
 class EventBus:
@@ -77,11 +79,11 @@ class EventBus:
         self.history: List[Event] = []
         self.max_history_size = 1000
         self._lock = threading.Lock()
-        
         logger.info("EventBus initialized")
     
     def subscribe(self, event_type: str, callback: Callable) -> None:
         """
+
         Subscribe to an event type.
         
         Args:
@@ -117,6 +119,7 @@ class EventBus:
             event: Event to publish
         """
         with self._lock:
+
             # Add event to history
             self.history.append(event)
             
