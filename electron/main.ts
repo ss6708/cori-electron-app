@@ -90,7 +90,7 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
         
         try {
           // Attach the Excel window to the main window
-          const { NativeWindow } = require('@electron/remote');
+          const { NativeWindow } = require('@electron/remote/main');
           console.log('NativeWindow class loaded successfully');
           
           const nativeWin = new NativeWindow({ handle: hwnd });
