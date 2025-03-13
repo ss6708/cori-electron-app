@@ -1,188 +1,175 @@
 """
 Event system for Cori backend.
-Provides a pub/sub mechanism for decoupling components.
+Provides a global event bus for publishing and subscribing to events.
 """
-from typing import Dict, List, Any, Callable, Optional
-from datetime import datetime
-import json
+
+from typing import Dict, List, Any, Optional, Union, Callable
 import threading
 import logging
+import uuid
+from datetime import datetime
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class Event:
-    """Base event class for the event system."""
+    """
+    Event class for the event system.
+    Represents an event with a type and data.
+    """
+    
     def __init__(self, event_type: str, data: Any = None):
+        """
+        Initialize an event.
+        
+        Args:
+            event_type: Type of the event
+            data: Data associated with the event
+        """
+        self.id = str(uuid.uuid4())
         self.event_type = event_type
         self.data = data
         self.timestamp = datetime.now().isoformat()
-        self.id = None  # Will be set by EventBus when added
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert event to dictionary for serialization."""
+        """
+        Convert the event to a dictionary.
+        
+        Returns:
+            Dictionary representation of the event
+        """
         return {
             "id": self.id,
-            "type": self.event_type,
+            "event_type": self.event_type,
             "data": self.data,
             "timestamp": self.timestamp
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Event':
-        """Create an Event instance from a dictionary."""
-        event = cls(data["type"], data["data"])
-        event.timestamp = data["timestamp"]
-        event.id = data["id"]
+        """
+        Create an event from a dictionary.
+        
+        Args:
+            data: Dictionary representation of the event
+            
+        Returns:
+            Event instance
+        """
+        event = cls(
+            event_type=data.get("event_type", "unknown"),
+            data=data.get("data")
+        )
+        event.id = data.get("id", str(uuid.uuid4()))
+        event.timestamp = data.get("timestamp", datetime.now().isoformat())
+
         return event
 
 class EventBus:
     """
-    Event bus for pub/sub communication between components.
-    Provides event history and filtering capabilities.
+    Event bus for publishing and subscribing to events.
+    Provides thread-safe operations for concurrent access.
     """
+    
     def __init__(self):
-        self._subscribers: Dict[str, List[Callable]] = {}
-        self._history: List[Event] = []
-        self._next_id = 0
+        """Initialize the event bus."""
+        self.subscribers: Dict[str, List[Callable]] = {}
+        self.history: List[Event] = []
+        self.max_history_size = 1000
         self._lock = threading.Lock()
         logger.info("EventBus initialized")
     
     def subscribe(self, event_type: str, callback: Callable) -> None:
         """
-        Subscribe to events of a specific type.
+
+        Subscribe to an event type.
         
         Args:
-            event_type: Type of events to subscribe to
+            event_type: Type of event to subscribe to
             callback: Function to call when an event of this type is published
         """
         with self._lock:
-            if event_type not in self._subscribers:
-                self._subscribers[event_type] = []
-            self._subscribers[event_type].append(callback)
-        logger.debug(f"Subscribed to event type: {event_type}")
+            if event_type not in self.subscribers:
+                self.subscribers[event_type] = []
+            
+            if callback not in self.subscribers[event_type]:
+                self.subscribers[event_type].append(callback)
+                logger.debug(f"Subscribed to event type: {event_type}")
     
-    def unsubscribe(self, event_type: str, callback: Callable) -> bool:
+    def unsubscribe(self, event_type: str, callback: Callable) -> None:
         """
-        Unsubscribe from events of a specific type.
+        Unsubscribe from an event type.
         
         Args:
-            event_type: Type of events to unsubscribe from
-            callback: Function to remove from subscribers
-            
-        Returns:
-            bool: True if successfully unsubscribed, False otherwise
+            event_type: Type of event to unsubscribe from
+            callback: Function to remove from the subscribers
         """
         with self._lock:
-            if event_type in self._subscribers and callback in self._subscribers[event_type]:
-                self._subscribers[event_type].remove(callback)
+            if event_type in self.subscribers and callback in self.subscribers[event_type]:
+                self.subscribers[event_type].remove(callback)
                 logger.debug(f"Unsubscribed from event type: {event_type}")
-                return True
-        return False
     
     def publish(self, event: Event) -> None:
         """
-        Publish an event to all subscribers.
+        Publish an event.
         
         Args:
             event: Event to publish
         """
         with self._lock:
-            # Assign ID and add to history
-            event.id = self._next_id
-            self._next_id += 1
-            self._history.append(event)
+
+            # Add event to history
+            self.history.append(event)
             
-            # Notify subscribers
-            if event.event_type in self._subscribers:
-                for callback in self._subscribers[event.event_type]:
-                    try:
-                        callback(event)
-                    except Exception as e:
-                        logger.error(f"Error in event callback: {e}")
+            # Trim history if it exceeds the maximum size
+            if len(self.history) > self.max_history_size:
+                self.history = self.history[-self.max_history_size:]
+            
+            # Get subscribers for this event type
+            subscribers = self.subscribers.get(event.event_type, [])
+            
+            # Get subscribers for all events
+            all_subscribers = self.subscribers.get("*", [])
+            
+            # Combine subscribers
+            all_subscribers = subscribers + all_subscribers
         
-        logger.debug(f"Published event: {event.event_type} (ID: {event.id})")
+        # Call subscribers outside the lock to avoid deadlocks
+        for callback in all_subscribers:
+            try:
+                callback(event)
+            except Exception as e:
+                logger.error(f"Error in event subscriber: {e}")
     
-    def get_history(self, event_type: Optional[str] = None, start_id: int = 0, 
-                   end_id: Optional[int] = None, limit: Optional[int] = None) -> List[Event]:
+    def get_history(self, event_type: Optional[str] = None, limit: Optional[int] = None) -> List[Event]:
         """
-        Get event history with optional filtering.
+        Get event history.
         
         Args:
-            event_type: Optional filter by event type
-            start_id: Get events with ID >= start_id
-            end_id: Get events with ID <= end_id
+            event_type: Optional event type to filter by
             limit: Maximum number of events to return
             
         Returns:
-            List of events matching the criteria
+            List of events
         """
         with self._lock:
-            # Filter by ID range
-            filtered = [e for e in self._history if e.id >= start_id]
-            if end_id is not None:
-                filtered = [e for e in filtered if e.id <= end_id]
-            
-            # Filter by event type
             if event_type:
-                filtered = [e for e in filtered if e.event_type == event_type]
+                events = [event for event in self.history if event.event_type == event_type]
+            else:
+                events = self.history.copy()
             
-            # Apply limit
             if limit:
-                filtered = filtered[-limit:]
+                events = events[-limit:]
             
-            return filtered
+            return events
     
     def clear_history(self) -> None:
-        """Clear the event history."""
+        """Clear event history."""
         with self._lock:
-            self._history = []
-            logger.info("Event history cleared")
-    
-    def save_history(self, file_path: str) -> None:
-        """
-        Save event history to a file.
-        
-        Args:
-            file_path: Path to save the history to
-        """
-        with self._lock:
-            history_data = [event.to_dict() for event in self._history]
-            
-        try:
-            with open(file_path, 'w') as f:
-                json.dump(history_data, f, indent=2)
-            logger.info(f"Event history saved to {file_path}")
-        except Exception as e:
-            logger.error(f"Error saving event history: {e}")
-    
-    def load_history(self, file_path: str) -> bool:
-        """
-        Load event history from a file.
-        
-        Args:
-            file_path: Path to load the history from
-            
-        Returns:
-            bool: True if successfully loaded, False otherwise
-        """
-        try:
-            with open(file_path, 'r') as f:
-                history_data = json.load(f)
-            
-            with self._lock:
-                self._history = [Event.from_dict(data) for data in history_data]
-                if self._history:
-                    self._next_id = max(event.id for event in self._history) + 1
-                else:
-                    self._next_id = 0
-            
-            logger.info(f"Event history loaded from {file_path}")
-            return True
-        except Exception as e:
-            logger.error(f"Error loading event history: {e}")
-            return False
+            self.history = []
+            logger.debug("Event history cleared")
 
-# Create a global event bus instance
+# Global event bus instance
 event_bus = EventBus()
