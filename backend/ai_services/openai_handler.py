@@ -13,7 +13,7 @@ class OpenAIHandler:
     
     def __init__(self):
         # Get API key from environment variable
-        self.api_key = os.environ.get("OpenAIApiKey")
+        self.api_key = os.environ.get("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OpenAI API key not found in environment variables")
         

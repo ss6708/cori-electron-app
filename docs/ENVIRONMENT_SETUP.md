@@ -33,6 +33,8 @@ export OPENAI_API_KEY=your_openai_api_key_here
 |---------------|-------------|----------|
 | `OPENAI_API_KEY` | Your OpenAI API key for GPT-4o-mini integration | Yes |
 
+**Important**: Make sure to use the exact variable name `OPENAI_API_KEY` (all uppercase with underscores).
+
 ## Installing python-dotenv
 
 The backend uses `python-dotenv` to load environment variables from the `.env` file. If you haven't installed it yet, run:
