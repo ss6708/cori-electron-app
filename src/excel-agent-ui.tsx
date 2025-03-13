@@ -17,6 +17,12 @@ import {
   TechSpreadsheetLargeIcon,
   TechArrowUpIcon,
   TechMaximizeIcon,
+  TechStatusIcon,
+  TechAnalyzingIcon,
+  TechWorkingIcon,
+  TechAttachmentIcon,
+  TechImageIcon,
+  TechFileIcon,
 } from "./components/tech-icons"
 import { Message, MessageGroup } from "./types/message"
 import { sendMessageToAI } from "./lib/api"
@@ -93,6 +99,7 @@ export default function ExcelAgentUI() {
   const [isTyping, setIsTyping] = useState(false)
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null)
   const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
+  const [agentStatus, setAgentStatus] = useState<"idle" | "analyzing" | "working">("idle")
 
   // Add state for typewriter effect
   const [displayedText, setDisplayedText] = useState<Record<number, string>>({})
@@ -194,6 +201,9 @@ export default function ExcelAgentUI() {
       setThinkingDuration(null)
       setIsTyping(true)
       
+      // Update agent status to analyzing
+      setAgentStatus("analyzing")
+      
       try {
         console.log("Sending message to OpenAI API...")
         // Send messages to OpenAI API
@@ -203,11 +213,24 @@ export default function ExcelAgentUI() {
         // When response is received, hide typing indicator
         setIsTyping(false)
         
+        // Update agent status based on response content
+        if (aiResponse.content.toLowerCase().includes("analyzing") || 
+            aiResponse.content.toLowerCase().includes("let me check")) {
+          setAgentStatus("analyzing")
+        } else if (aiResponse.content.toLowerCase().includes("working") || 
+                  aiResponse.content.toLowerCase().includes("updating") ||
+                  aiResponse.content.toLowerCase().includes("modifying")) {
+          setAgentStatus("working")
+        } else {
+          setAgentStatus("idle")
+        }
+        
         // Add AI response to messages
         setMessages((prev) => [...prev, aiResponse])
       } catch (error) {
         console.error("Error getting AI response:", error)
         setIsTyping(false)
+        setAgentStatus("idle")
         
         // Add error message
         setMessages((prev) => [
@@ -469,8 +492,32 @@ export default function ExcelAgentUI() {
                 </ScrollArea>
               </div>
 
+              {/* Status Bar */}
+              <div className="mt-4 mb-2">
+                <div className="flex items-center px-2 py-1.5 bg-[#1a2035]/20 backdrop-blur-sm rounded-md border border-[#ffffff0f] text-xs">
+                  {agentStatus === "idle" && (
+                    <>
+                      <TechStatusIcon className="mr-2 text-blue-300/90" />
+                      <span className="text-blue-300/90 font-mono">Awaiting instructions...</span>
+                    </>
+                  )}
+                  {agentStatus === "analyzing" && (
+                    <>
+                      <TechAnalyzingIcon className="mr-2 text-yellow-300/90 animate-pulse" />
+                      <span className="text-yellow-300/90 font-mono">Analyzing your request...</span>
+                    </>
+                  )}
+                  {agentStatus === "working" && (
+                    <>
+                      <TechWorkingIcon className="mr-2 text-green-300/90 animate-pulse" />
+                      <span className="text-green-300/90 font-mono">Working on your Excel model...</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
               {/* Chat Input - Auto-expanding Textarea */}
-              <div className="mt-4">
+              <div className="mt-2">
                 <div className="relative">
                   <Textarea
                     ref={textareaRef}
@@ -478,7 +525,7 @@ export default function ExcelAgentUI() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Send a message..."
-                    className="bg-[#1a2035]/30 border-[#ffffff0f] pr-10 text-sm backdrop-blur-md shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] placeholder:text-gray-  pr-10 text-sm backdrop-blur-md shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] placeholder:text-gray-500 min-h-[40px] max-h-[120px] resize-none py-2 px-3 transition-all duration-300 focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] gradient-border"
+                    className="bg-[#1a2035]/30 border-[#ffffff0f] pr-10 text-sm backdrop-blur-md shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] placeholder:text-gray-500 min-h-[40px] max-h-[120px] resize-none py-2 px-3 transition-all duration-300 focus:shadow-[0_0_15px_rgba(59,130,246,0.2)] gradient-border"
                     style={{ overflow: "hidden" }}
                   />
                   <Button
@@ -487,6 +534,34 @@ export default function ExcelAgentUI() {
                     disabled={!input.trim()}
                   >
                     <TechArrowUpIcon />
+                  </Button>
+                </div>
+                
+                {/* File Attachment Buttons */}
+                <div className="flex items-center mt-2 space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                  >
+                    <TechAttachmentIcon className="mr-1.5" />
+                    <span>Attach</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                  >
+                    <TechImageIcon className="mr-1.5" />
+                    <span>Image</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs bg-[#1a2035]/20 hover:bg-[#1a2035]/40 text-gray-300 rounded-md backdrop-blur-sm border border-[#ffffff0f] transition-all duration-300"
+                  >
+                    <TechFileIcon className="mr-1.5" />
+                    <span>File</span>
                   </Button>
                 </div>
               </div>
