@@ -67,6 +67,7 @@
     "tailwind-merge": "^3.0.2",
     "tailwindCSS": "npm:tailwindcss@^4.0.13",
     "vaul": "^1.1.2",
+    "win32-api": "^26.1.2",
     "winax": "^3.6.1",
     "zod": "^3.24.2"
   },
