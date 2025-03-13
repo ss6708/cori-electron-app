@@ -90,14 +90,22 @@ ipcMain.handle('embed-excel-window', async (event, targetElementId) => {
         
         try {
           // Attach the Excel window to the main window
-          const { NativeWindow } = require('@electron/remote/main');
-          console.log('NativeWindow class loaded successfully');
+          // Import the entire remote module
+          const remote = require('@electron/remote/main');
+          console.log('Remote module loaded successfully');
           
-          const nativeWin = new NativeWindow({ handle: hwnd });
-          console.log('NativeWindow instance created successfully');
+          // Use the correct approach to set the parent window
+          console.log('Setting Excel window as child of main window');
+          // Use alternative approach with setParent directly
           
-          const result = nativeWin.setParent(excelWindow);
-          console.log('setParent result:', result);
+          // Use win32 APIs to set parent window
+          const win32 = require('win32-api');
+          const User32 = win32.User32;
+          const user32 = User32.load();
+          
+          // Set Excel window as child of Electron window
+          const result = user32.SetParent(hwnd, excelWindow.getNativeWindowHandle());
+          console.log('SetParent result:', result);
           
           return { success: true, message: "Excel window embedded successfully" };
         } catch (attachError) {
