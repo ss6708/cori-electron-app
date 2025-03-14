@@ -1,289 +1,279 @@
-"""
-User preference store for Cori RAG++ system.
-This module provides a store for user preferences.
-"""
-
+from typing import Dict, List, Optional, Any, Tuple
+import uuid
 import os
 import json
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 
-from .models.preference import Preference
-from .long_term_memory import LongTermMemory
+from .models.preference import UserPreference, ModelingPreference, AnalysisPreference, VisualizationPreference, WorkflowPreference
 
 class UserPreferenceStore:
     """
-    User preference store for storing and retrieving user preferences.
+    Manages storage and retrieval of user preferences.
+    This is part of the second tier of the three-tier memory architecture.
     """
     
-    def __init__(
-        self,
-        long_term_memory: LongTermMemory,
-        preference_dir: str = "preferences"
-    ):
+    def __init__(self, storage_path: str, user_id: str):
         """
         Initialize the user preference store.
         
         Args:
-            long_term_memory: Long-term memory for storing preferences
-            preference_dir: Directory for storing preference files
+            storage_path: Path to the preference storage directory
+            user_id: Identifier for the user
         """
-        self.long_term_memory = long_term_memory
-        self.preference_dir = preference_dir
+        self.storage_path = storage_path
+        self.user_id = user_id
+        self.preferences: Dict[str, UserPreference] = {}
         
-        # Create preference directory if it doesn't exist
-        os.makedirs(preference_dir, exist_ok=True)
+        # Ensure storage directory exists
+        os.makedirs(storage_path, exist_ok=True)
+        
+        # Load existing preferences
+        self._load_preferences()
     
-    def add_preference(self, preference: Preference) -> str:
+    def _load_preferences(self) -> None:
+        """Load preferences from storage."""
+        preference_file = os.path.join(self.storage_path, f"{self.user_id}_preferences.json")
+        
+        if os.path.exists(preference_file):
+            try:
+                with open(preference_file, 'r') as f:
+                    preferences_data = json.load(f)
+                
+                for pref_data in preferences_data:
+                    pref_type = pref_data.get("preference_type")
+                    
+                    if pref_type == "modeling":
+                        preference = ModelingPreference(**pref_data)
+                    elif pref_type == "analysis":
+                        preference = AnalysisPreference(**pref_data)
+                    elif pref_type == "visualization":
+                        preference = VisualizationPreference(**pref_data)
+                    elif pref_type == "workflow":
+                        preference = WorkflowPreference(**pref_data)
+                    else:
+                        # Generic preference
+                        preference = UserPreference(**pref_data)
+                    
+                    self.preferences[preference.id] = preference
+            except Exception as e:
+                print(f"Error loading preferences: {e}")
+    
+    def _save_preferences(self) -> None:
+        """Save preferences to storage."""
+        preference_file = os.path.join(self.storage_path, f"{self.user_id}_preferences.json")
+        
+        try:
+            preferences_data = [pref.to_dict() for pref in self.preferences.values()]
+            
+            with open(preference_file, 'w') as f:
+                json.dump(preferences_data, f, default=str)
+        except Exception as e:
+            print(f"Error saving preferences: {e}")
+    
+    def add_preference(self, preference: UserPreference) -> str:
         """
-        Add a preference to the store.
+        Add a preference.
         
         Args:
-            preference: Preference to add
+            preference: The preference to add
             
         Returns:
-            ID of the added preference
+            Preference ID
         """
-        # Create user directory if it doesn't exist
-        user_dir = os.path.join(self.preference_dir, preference.user_id)
-        os.makedirs(user_dir, exist_ok=True)
+        # Ensure user_id matches
+        if preference.user_id != self.user_id:
+            preference.user_id = self.user_id
         
-        # Create domain directory if it doesn't exist
-        domain_dir = os.path.join(user_dir, preference.domain)
-        os.makedirs(domain_dir, exist_ok=True)
-        
-        # Create preference file
-        preference_file = os.path.join(domain_dir, f"{preference.key}.json")
-        
-        # Write preference to file
-        with open(preference_file, "w") as f:
-            json.dump(preference.to_dict(), f, indent=2)
-        
-        # Add preference to long-term memory
-        preference_text = f"{preference.description}: {preference.value}"
-        
-        self.long_term_memory.add_document(
-            collection_name="preferences",
-            doc_id=preference.id,
-            text=preference_text,
-            metadata={
-                "user_id": preference.user_id,
-                "domain": preference.domain,
-                "key": preference.key,
-                "value": preference.value,
-                "description": preference.description,
-                "timestamp": preference.timestamp,
-                "type": "preference"
-            }
-        )
+        self.preferences[preference.id] = preference
+        self._save_preferences()
         
         return preference.id
     
-    def get_preference(self, preference_id: str) -> Optional[Preference]:
+    def get_preference(self, preference_id: str) -> Optional[UserPreference]:
         """
-        Get a preference from the store.
+        Get a preference by ID.
         
         Args:
-            preference_id: ID of the preference
+            preference_id: The preference ID
             
         Returns:
-            Preference or None if not found
+            Preference if found, None otherwise
         """
-        # Get preference from long-term memory
-        doc = self.long_term_memory.get_document(
-            doc_id=preference_id,
-            collection_name="preferences"
-        )
-        
-        if not doc:
-            return None
-        
-        # Create preference from document
-        preference_data = {
-            "id": doc["id"],
-            "user_id": doc["metadata"]["user_id"],
-            "domain": doc["metadata"]["domain"],
-            "key": doc["metadata"]["key"],
-            "value": doc["metadata"]["value"],
-            "description": doc["metadata"]["description"],
-            "timestamp": doc["metadata"]["timestamp"]
-        }
-        
-        return Preference.from_dict(preference_data)
+        return self.preferences.get(preference_id)
     
-    def get_user_preferences(self, user_id: str) -> List[Preference]:
+    def update_preference(self, preference: UserPreference) -> bool:
         """
-        Get all preferences for a user.
+        Update a preference.
         
         Args:
-            user_id: ID of the user
+            preference: The updated preference
             
         Returns:
-            List of preferences
+            True if preference was updated, False otherwise
         """
-        # Get preferences from long-term memory
-        docs = self.long_term_memory.search_by_metadata(
-            collection_name="preferences",
-            filters={"user_id": user_id, "type": "preference"}
-        )
+        if preference.id not in self.preferences:
+            return False
         
-        # Create preferences from documents
-        preferences = []
-        for doc in docs:
-            preference_data = {
-                "id": doc["id"],
-                "user_id": doc["metadata"]["user_id"],
-                "domain": doc["metadata"]["domain"],
-                "key": doc["metadata"]["key"],
-                "value": doc["metadata"]["value"],
-                "description": doc["metadata"]["description"],
-                "timestamp": doc["metadata"]["timestamp"]
-            }
-            
-            preferences.append(Preference.from_dict(preference_data))
+        # Ensure user_id matches
+        if preference.user_id != self.user_id:
+            preference.user_id = self.user_id
         
-        return preferences
+        self.preferences[preference.id] = preference
+        self._save_preferences()
+        
+        return True
     
-    def get_domain_preferences(self, user_id: str, domain: str) -> List[Preference]:
+    def delete_preference(self, preference_id: str) -> bool:
         """
-        Get preferences for a user in a specific domain.
+        Delete a preference.
         
         Args:
-            user_id: ID of the user
-            domain: Domain of the preferences
+            preference_id: The preference ID
             
         Returns:
-            List of preferences
+            True if preference was deleted, False otherwise
         """
-        # Get preferences from long-term memory
-        docs = self.long_term_memory.search_by_metadata(
-            collection_name="preferences",
-            filters={"user_id": user_id, "domain": domain, "type": "preference"}
-        )
+        if preference_id not in self.preferences:
+            return False
         
-        # Create preferences from documents
-        preferences = []
-        for doc in docs:
-            preference_data = {
-                "id": doc["id"],
-                "user_id": doc["metadata"]["user_id"],
-                "domain": doc["metadata"]["domain"],
-                "key": doc["metadata"]["key"],
-                "value": doc["metadata"]["value"],
-                "description": doc["metadata"]["description"],
-                "timestamp": doc["metadata"]["timestamp"]
-            }
-            
-            preferences.append(Preference.from_dict(preference_data))
+        del self.preferences[preference_id]
+        self._save_preferences()
         
-        return preferences
+        return True
     
-    def get_preference_by_key(self, user_id: str, domain: str, key: str) -> Optional[Preference]:
+    def get_preferences_by_type(self, preference_type: str) -> List[UserPreference]:
         """
-        Get a preference by key.
+        Get preferences by type.
         
         Args:
-            user_id: ID of the user
-            domain: Domain of the preference
-            key: Key of the preference
+            preference_type: The preference type
             
         Returns:
-            Preference or None if not found
+            List of preferences of the specified type
         """
-        # Get preference from long-term memory
-        docs = self.long_term_memory.search_by_metadata(
-            collection_name="preferences",
-            filters={
-                "user_id": user_id,
-                "domain": domain,
-                "key": key,
-                "type": "preference"
-            }
-        )
-        
-        if not docs:
-            return None
-        
-        # Create preference from document
-        doc = docs[0]
-        preference_data = {
-            "id": doc["id"],
-            "user_id": doc["metadata"]["user_id"],
-            "domain": doc["metadata"]["domain"],
-            "key": doc["metadata"]["key"],
-            "value": doc["metadata"]["value"],
-            "description": doc["metadata"]["description"],
-            "timestamp": doc["metadata"]["timestamp"]
-        }
-        
-        return Preference.from_dict(preference_data)
+        return [
+            pref for pref in self.preferences.values()
+            if pref.preference_type == preference_type
+        ]
     
-    def update_preference(self, preference: Preference) -> None:
+    def get_preferences_by_domain(self, domain: str) -> List[UserPreference]:
         """
-        Update a preference in the store.
+        Get preferences by domain.
         
         Args:
-            preference: Preference to update
+            domain: The domain
+            
+        Returns:
+            List of preferences for the specified domain
         """
-        # Create user directory if it doesn't exist
-        user_dir = os.path.join(self.preference_dir, preference.user_id)
-        os.makedirs(user_dir, exist_ok=True)
-        
-        # Create domain directory if it doesn't exist
-        domain_dir = os.path.join(user_dir, preference.domain)
-        os.makedirs(domain_dir, exist_ok=True)
-        
-        # Create preference file
-        preference_file = os.path.join(domain_dir, f"{preference.key}.json")
-        
-        # Write preference to file
-        with open(preference_file, "w") as f:
-            json.dump(preference.to_dict(), f, indent=2)
-        
-        # Update preference in long-term memory
-        preference_text = f"{preference.description}: {preference.value}"
-        
-        self.long_term_memory.update_document(
-            doc_id=preference.id,
-            collection_name="preferences",
-            text=preference_text,
-            metadata={
-                "user_id": preference.user_id,
-                "domain": preference.domain,
-                "key": preference.key,
-                "value": preference.value,
-                "description": preference.description,
-                "timestamp": preference.timestamp,
-                "type": "preference"
-            }
-        )
+        return [
+            pref for pref in self.preferences.values()
+            if pref.domain == domain
+        ]
     
-    def delete_preference(self, preference_id: str) -> None:
+    def get_contextual_preferences(
+        self,
+        domain: Optional[str] = None,
+        preference_type: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> List[UserPreference]:
         """
-        Delete a preference from the store.
+        Get preferences based on context.
         
         Args:
-            preference_id: ID of the preference
+            domain: Optional domain filter
+            preference_type: Optional preference type filter
+            context: Optional additional context for filtering
+            
+        Returns:
+            List of relevant preferences
         """
-        # Get preference
-        preference = self.get_preference(preference_id)
+        # Start with all preferences
+        filtered_preferences = list(self.preferences.values())
         
-        if not preference:
-            return
+        # Filter by domain if specified
+        if domain:
+            filtered_preferences = [
+                pref for pref in filtered_preferences
+                if pref.domain == domain or pref.domain == "general"
+            ]
         
-        # Delete preference file
-        preference_file = os.path.join(
-            self.preference_dir,
-            preference.user_id,
-            preference.domain,
-            f"{preference.key}.json"
+        # Filter by preference type if specified
+        if preference_type:
+            filtered_preferences = [
+                pref for pref in filtered_preferences
+                if pref.preference_type == preference_type
+            ]
+        
+        # Apply additional context-based filtering
+        if context:
+            # This would be extended with more sophisticated filtering
+            # based on the specific context and preference types
+            pass
+        
+        return filtered_preferences
+    
+    def create_modeling_preference(
+        self,
+        approach: str,
+        parameters: Dict[str, Any],
+        description: str,
+        domain: str = "general"
+    ) -> str:
+        """
+        Create a modeling preference.
+        
+        Args:
+            approach: Modeling approach
+            parameters: Modeling parameters
+            description: Preference description
+            domain: Optional domain
+            
+        Returns:
+            Preference ID
+        """
+        preference = ModelingPreference(
+            id=str(uuid.uuid4()),
+            user_id=self.user_id,
+            timestamp=datetime.now(),
+            domain=domain,
+            approach=approach,
+            parameters=parameters,
+            description=description
         )
         
-        if os.path.exists(preference_file):
-            os.remove(preference_file)
+        return self.add_preference(preference)
+    
+    def create_analysis_preference(
+        self,
+        method: str,
+        metrics: List[str],
+        parameters: Dict[str, Any],
+        description: str,
+        domain: str = "general"
+    ) -> str:
+        """
+        Create an analysis preference.
         
-        # Delete preference from long-term memory
-        self.long_term_memory.delete_document(
-            doc_id=preference_id,
-            collection_name="preferences"
+        Args:
+            method: Analysis method
+            metrics: Analysis metrics
+            parameters: Analysis parameters
+            description: Preference description
+            domain: Optional domain
+            
+        Returns:
+            Preference ID
+        """
+        preference = AnalysisPreference(
+            id=str(uuid.uuid4()),
+            user_id=self.user_id,
+            timestamp=datetime.now(),
+            domain=domain,
+            method=method,
+            metrics=metrics,
+            parameters=parameters,
+            description=description
         )
+        
+        return self.add_preference(preference)
