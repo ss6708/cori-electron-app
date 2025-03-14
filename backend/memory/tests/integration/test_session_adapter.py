@@ -19,9 +19,25 @@ from backend.core.session_persistence import SessionManager
 from backend.core.state_management import AgentStateController, AgentState
 from backend.models.message import Message as CoreMessage
 
-# Import RAG++ classes
+# Import Memory Event classes
+from backend.memory.models.event import (
+    Event as MemoryEvent,
+    UserMessageEvent as MemoryUserMessageEvent,
+    AssistantMessageEvent as MemoryAssistantMessageEvent,
+    SystemMessageEvent as MemorySystemMessageEvent,
+    CondensationEvent as MemoryCondensationEvent
+)
+
+# Import RAG++ Event classes
+from backend.memory.models.rag.event import (
+    Event as RAGEvent,
+    UserMessageEvent,
+    AssistantMessageEvent,
+    SystemMessageEvent
+)
+
+# Import memory components
 from backend.memory.conversation_memory import ConversationMemory
-from backend.memory.models.event import Event as RAGEvent
 
 # Import adapters
 from backend.memory.adapters.session_adapter import SessionAdapter

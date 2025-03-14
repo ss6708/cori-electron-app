@@ -11,8 +11,23 @@ import json
 import tempfile
 from unittest.mock import MagicMock, patch
 
-# Import RAG++ classes
-from backend.memory.models.event import Event as RAGEvent
+# Import Memory Event classes
+from backend.memory.models.event import (
+    Event as MemoryEvent,
+    UserMessageEvent as MemoryUserMessageEvent,
+    AssistantMessageEvent as MemoryAssistantMessageEvent,
+    SystemMessageEvent as MemorySystemMessageEvent,
+    CondensationEvent as MemoryCondensationEvent
+)
+
+# Import RAG++ Event classes
+from backend.memory.models.rag.event import (
+    Event as RAGEvent,
+    UserMessageEvent,
+    AssistantMessageEvent,
+    SystemMessageEvent
+)
+
 from backend.memory.rag_enhanced_openai import RAGEnhancedOpenAIHandler
 
 # Mock core classes
