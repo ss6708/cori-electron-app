@@ -5,12 +5,25 @@ Provides adapters for converting between core Event and RAG++ Event models.
 
 from typing import Dict, Any, Optional, List, Union
 import logging
+import threading
+import uuid
+from datetime import datetime
 
 # Import core Event class
 from backend.core.event_system import Event as CoreEvent
 
-# Import RAG++ Event class
-from backend.memory.models.event import Event as RAGEvent
+# Import Memory Event class
+from backend.memory.models.event import Event as MemoryEvent
+
+# Import RAG++ Event classes
+from backend.memory.models.rag.event import (
+    Event as RAGEvent,
+    FinancialModelingEvent,
+    UserMessageEvent,
+    AssistantMessageEvent,
+    SystemMessageEvent,
+    ToolCallEvent
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,100 +31,220 @@ logger = logging.getLogger(__name__)
 
 class EventAdapter:
     """
-    Adapter for converting between core Event and RAG++ Event models.
-    Provides methods to convert from RAG++ Event to core Event and vice versa.
+    Adapter for converting between core Event, Memory Event, and RAG Event models.
+    Provides methods to convert between different event models.
+    Thread-safe for concurrent operations.
     """
     
-    @staticmethod
-    def rag_to_core(rag_event: RAGEvent) -> CoreEvent:
+    def __init__(self):
         """
-        Convert a RAG++ Event to a core Event.
+        Initialize the event adapter.
+        """
+        self._lock = threading.Lock()
+        logger.info("EventAdapter initialized")
+    
+    def core_to_memory(self, core_event: CoreEvent) -> MemoryEvent:
+        """
+        Convert a core Event to a memory Event.
         
         Args:
-            rag_event: RAG++ Event to convert
+            core_event: Core Event instance
             
         Returns:
-            Converted core Event
+            Memory Event instance
         """
-        # Create a core Event with the RAG++ Event data
-        core_event = CoreEvent(
-            event_type="conversation",
-            data={
-                "role": rag_event.role,
-                "content": rag_event.content,
-                "metadata": rag_event.metadata,
-                "original_id": rag_event.id,
-                "original_timestamp": rag_event.timestamp
+        with self._lock:
+            # Extract data from core event
+            event_data = core_event.data if isinstance(core_event.data, dict) else {}
+            
+            # Create memory event
+            memory_event = MemoryEvent(
+                id=core_event.id,
+                role=event_data.get("role", "system"),
+                content=event_data.get("content", ""),
+                timestamp=core_event.timestamp,
+                metadata=event_data.get("metadata", {})
+            )
+            
+            return memory_event
+    
+    def memory_to_core(self, memory_event: MemoryEvent) -> CoreEvent:
+        """
+        Convert a memory Event to a core Event.
+        
+        Args:
+            memory_event: Memory Event instance
+            
+        Returns:
+            Core Event instance
+        """
+        with self._lock:
+            # Create event data
+            event_data = {
+                "role": memory_event.role,
+                "content": memory_event.content,
+                "metadata": memory_event.metadata
             }
-        )
-        
-        logger.debug(f"Converted RAG++ Event to core Event: {rag_event.id} -> {core_event.event_type}")
-        return core_event
+            
+            # Create core event
+            core_event = CoreEvent(
+                event_type="message",
+                data=event_data
+            )
+            
+            # Set id and timestamp
+            core_event.id = memory_event.id
+            core_event.timestamp = memory_event.timestamp
+            
+            return core_event
     
-    @staticmethod
-    def core_to_rag(core_event: CoreEvent) -> Optional[RAGEvent]:
+    def memory_to_rag(self, memory_event: MemoryEvent, user_id: str, session_id: str) -> RAGEvent:
         """
-        Convert a core Event to a RAG++ Event if possible.
+        Convert a memory Event to a RAG Event.
         
         Args:
-            core_event: Core Event to convert
+            memory_event: Memory Event instance
+            user_id: User ID
+            session_id: Session ID
             
         Returns:
-            Converted RAG++ Event or None if conversion is not possible
+            RAG Event instance
         """
-        # Check if the core Event is a conversation event
-        if core_event.event_type != "conversation" or not isinstance(core_event.data, dict):
-            logger.debug(f"Cannot convert core Event to RAG++ Event: {core_event.event_type}")
-            return None
-        
-        # Extract data from the core Event
-        data = core_event.data
-        
-        # Create a RAG++ Event with the core Event data
-        rag_event = RAGEvent(
-            id=data.get("original_id"),
-            role=data.get("role", "system"),
-            content=data.get("content", ""),
-            timestamp=data.get("original_timestamp"),
-            metadata=data.get("metadata", {})
-        )
-        
-        logger.debug(f"Converted core Event to RAG++ Event: {core_event.event_type} -> {rag_event.id}")
-        return rag_event
+        with self._lock:
+            # Determine event type based on role
+            if memory_event.role == "user":
+                rag_event = UserMessageEvent(
+                    id=memory_event.id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    content=memory_event.content,
+                    context=memory_event.metadata.get("context", {})
+                )
+            elif memory_event.role == "assistant":
+                rag_event = AssistantMessageEvent(
+                    id=memory_event.id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    content=memory_event.content,
+                    context=memory_event.metadata.get("context", {})
+                )
+            else:
+                rag_event = SystemMessageEvent(
+                    id=memory_event.id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    content=memory_event.content,
+                    context=memory_event.metadata.get("context", {})
+                )
+            
+            # Set timestamp if available
+            if hasattr(memory_event, "timestamp") and memory_event.timestamp:
+                try:
+                    # Convert ISO format to datetime
+                    if isinstance(memory_event.timestamp, str):
+                        rag_event.timestamp = datetime.fromisoformat(memory_event.timestamp.rstrip("Z"))
+                except ValueError:
+                    # Use current time if conversion fails
+                    pass
+            
+            # Set domain if available in metadata
+            if "domain" in memory_event.metadata:
+                rag_event.domain = memory_event.metadata["domain"]
+            
+            return rag_event
     
-    @staticmethod
-    def rag_to_core_batch(rag_events: List[RAGEvent]) -> List[CoreEvent]:
+    def rag_to_memory(self, rag_event: RAGEvent) -> MemoryEvent:
         """
-        Convert a batch of RAG++ Events to core Events.
+        Convert a RAG Event to a memory Event.
         
         Args:
-            rag_events: List of RAG++ Events to convert
+            rag_event: RAG Event instance
             
         Returns:
-            List of converted core Events
+            Memory Event instance
         """
-        return [EventAdapter.rag_to_core(event) for event in rag_events]
+        with self._lock:
+            # Determine role based on event type
+            if isinstance(rag_event, UserMessageEvent):
+                role = "user"
+            elif isinstance(rag_event, AssistantMessageEvent):
+                role = "assistant"
+            else:
+                role = "system"
+            
+            # Create metadata
+            metadata = {
+                "user_id": rag_event.user_id,
+                "session_id": rag_event.session_id,
+                "context": rag_event.context if hasattr(rag_event, "context") else {}
+            }
+            
+            # Add domain if available
+            if hasattr(rag_event, "domain"):
+                metadata["domain"] = rag_event.domain
+            
+            # Create memory event
+            memory_event = MemoryEvent(
+                id=rag_event.id,
+                role=role,
+                content=rag_event.content if hasattr(rag_event, "content") else "",
+                timestamp=rag_event.timestamp.isoformat() + "Z",
+                metadata=metadata
+            )
+            
+            return memory_event
     
-    @staticmethod
-    def core_to_rag_batch(core_events: List[CoreEvent]) -> List[RAGEvent]:
+    def batch_core_to_memory(self, core_events: List[CoreEvent]) -> List[MemoryEvent]:
         """
-        Convert a batch of core Events to RAG++ Events.
+        Convert a list of core Events to memory Events.
         
         Args:
-            core_events: List of core Events to convert
+            core_events: List of core Event instances
             
         Returns:
-            List of converted RAG++ Events (excluding any that couldn't be converted)
+            List of memory Event instances
         """
-        rag_events = []
-        for event in core_events:
-            rag_event = EventAdapter.core_to_rag(event)
-            if rag_event:
-                rag_events.append(rag_event)
-        return rag_events
+        return [self.core_to_memory(event) for event in core_events]
     
-    @staticmethod
-    def register_rag_event_types() -> List[str]:
+    def batch_memory_to_core(self, memory_events: List[MemoryEvent]) -> List[CoreEvent]:
+        """
+        Convert a list of memory Events to core Events.
+        
+        Args:
+            memory_events: List of memory Event instances
+            
+        Returns:
+            List of core Event instances
+        """
+        return [self.memory_to_core(event) for event in memory_events]
+    
+    def batch_memory_to_rag(self, memory_events: List[MemoryEvent], user_id: str, session_id: str) -> List[RAGEvent]:
+        """
+        Convert a list of memory Events to RAG Events.
+        
+        Args:
+            memory_events: List of memory Event instances
+            user_id: User ID
+            session_id: Session ID
+            
+        Returns:
+            List of RAG Event instances
+        """
+        return [self.memory_to_rag(event, user_id, session_id) for event in memory_events]
+    
+    def batch_rag_to_memory(self, rag_events: List[RAGEvent]) -> List[MemoryEvent]:
+        """
+        Convert a list of RAG Events to memory Events.
+        
+        Args:
+            rag_events: List of RAG Event instances
+            
+        Returns:
+            List of memory Event instances
+        """
+        return [self.rag_to_memory(event) for event in rag_events]
+    
+    def register_rag_event_types(self) -> List[str]:
         """
         Register standard event types for RAG++ operations.
         
