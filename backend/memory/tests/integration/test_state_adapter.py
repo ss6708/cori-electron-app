@@ -12,6 +12,23 @@ import tempfile
 from unittest.mock import MagicMock, patch
 from enum import Enum
 
+# Import Memory Event classes
+from backend.memory.models.event import (
+    Event as MemoryEvent,
+    UserMessageEvent as MemoryUserMessageEvent,
+    AssistantMessageEvent as MemoryAssistantMessageEvent,
+    SystemMessageEvent as MemorySystemMessageEvent,
+    CondensationEvent as MemoryCondensationEvent
+)
+
+# Import RAG++ Event classes
+from backend.memory.models.rag.event import (
+    Event as RAGEvent,
+    UserMessageEvent,
+    AssistantMessageEvent,
+    SystemMessageEvent
+)
+
 # Import adapters
 from backend.memory.adapters.state_adapter import StateAwareComponent, StateAwareRAGHandler
 
