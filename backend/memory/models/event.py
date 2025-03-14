@@ -123,3 +123,94 @@ class Event:
             String representation of the event
         """
         return f"Event(id={self.id}, role={self.role}, content={self.content[:20]}..., timestamp={self.timestamp})"
+
+
+class UserMessageEvent(Event):
+    """Event for user messages."""
+    
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        content: str = "",
+        timestamp: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(id, "user", content, timestamp, metadata)
+
+
+class AssistantMessageEvent(Event):
+    """Event for assistant messages."""
+    
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        content: str = "",
+        timestamp: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(id, "assistant", content, timestamp, metadata)
+
+
+class SystemMessageEvent(Event):
+    """Event for system messages."""
+    
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        content: str = "",
+        timestamp: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        super().__init__(id, "system", content, timestamp, metadata)
+
+
+class CondensationEvent(Event):
+    """
+    Event representing a condensation of multiple events.
+    Used to summarize conversation history.
+    """
+    
+    def __init__(
+        self,
+        id: Optional[str] = None,
+        content: str = "",
+        timestamp: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        original_event_ids: Optional[List[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Initialize a condensation event.
+        
+        Args:
+            id: Unique identifier for the event
+            content: Content of the condensation
+            timestamp: Timestamp of the event
+            user_id: ID of the user
+            session_id: ID of the session
+            original_event_ids: IDs of the original events being condensed
+            metadata: Additional metadata for the event
+        """
+        meta = metadata or {}
+        meta.update({
+            "user_id": user_id,
+            "session_id": session_id,
+            "original_event_ids": original_event_ids or []
+        })
+        super().__init__(id, "system", content, timestamp, meta)
+    
+    @property
+    def user_id(self) -> Optional[str]:
+        """Get the user ID."""
+        return self.metadata.get("user_id")
+    
+    @property
+    def session_id(self) -> Optional[str]:
+        """Get the session ID."""
+        return self.metadata.get("session_id")
+    
+    @property
+    def original_event_ids(self) -> List[str]:
+        """Get the IDs of the original events."""
+        return self.metadata.get("original_event_ids", [])

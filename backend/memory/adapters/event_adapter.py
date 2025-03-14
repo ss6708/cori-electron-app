@@ -12,8 +12,14 @@ from datetime import datetime
 # Import core Event class
 from backend.core.event_system import Event as CoreEvent
 
-# Import Memory Event class
-from backend.memory.models.event import Event as MemoryEvent
+# Import Memory Event classes
+from backend.memory.models.event import (
+    Event as MemoryEvent,
+    UserMessageEvent as MemoryUserMessageEvent,
+    AssistantMessageEvent as MemoryAssistantMessageEvent,
+    SystemMessageEvent as MemorySystemMessageEvent,
+    CondensationEvent as MemoryCondensationEvent
+)
 
 # Import RAG++ Event classes
 from backend.memory.models.rag.event import (
@@ -111,8 +117,8 @@ class EventAdapter:
             RAG Event instance
         """
         with self._lock:
-            # Determine event type based on role
-            if memory_event.role == "user":
+            # Handle specific memory event types
+            if isinstance(memory_event, MemoryUserMessageEvent):
                 rag_event = UserMessageEvent(
                     id=memory_event.id,
                     user_id=user_id,
@@ -120,7 +126,7 @@ class EventAdapter:
                     content=memory_event.content,
                     context=memory_event.metadata.get("context", {})
                 )
-            elif memory_event.role == "assistant":
+            elif isinstance(memory_event, MemoryAssistantMessageEvent):
                 rag_event = AssistantMessageEvent(
                     id=memory_event.id,
                     user_id=user_id,
@@ -128,7 +134,7 @@ class EventAdapter:
                     content=memory_event.content,
                     context=memory_event.metadata.get("context", {})
                 )
-            else:
+            elif isinstance(memory_event, MemorySystemMessageEvent):
                 rag_event = SystemMessageEvent(
                     id=memory_event.id,
                     user_id=user_id,
@@ -136,6 +142,41 @@ class EventAdapter:
                     content=memory_event.content,
                     context=memory_event.metadata.get("context", {})
                 )
+            elif isinstance(memory_event, MemoryCondensationEvent):
+                # Handle condensation events
+                rag_event = SystemMessageEvent(
+                    id=memory_event.id,
+                    user_id=user_id,
+                    session_id=session_id,
+                    content=memory_event.content,
+                    context={"original_event_ids": memory_event.original_event_ids}
+                )
+            else:
+                # Determine event type based on role for generic events
+                if memory_event.role == "user":
+                    rag_event = UserMessageEvent(
+                        id=memory_event.id,
+                        user_id=user_id,
+                        session_id=session_id,
+                        content=memory_event.content,
+                        context=memory_event.metadata.get("context", {})
+                    )
+                elif memory_event.role == "assistant":
+                    rag_event = AssistantMessageEvent(
+                        id=memory_event.id,
+                        user_id=user_id,
+                        session_id=session_id,
+                        content=memory_event.content,
+                        context=memory_event.metadata.get("context", {})
+                    )
+                else:
+                    rag_event = SystemMessageEvent(
+                        id=memory_event.id,
+                        user_id=user_id,
+                        session_id=session_id,
+                        content=memory_event.content,
+                        context=memory_event.metadata.get("context", {})
+                    )
             
             # Set timestamp if available
             if hasattr(memory_event, "timestamp") and memory_event.timestamp:
