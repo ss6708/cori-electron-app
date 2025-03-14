@@ -1,207 +1,130 @@
-"""
-Conversation memory for Cori RAG++ system.
-Provides mechanisms for storing and retrieving conversation events.
-"""
-
-from typing import Dict, List, Any, Optional, Union
-import os
-import json
-import threading
-import logging
+from typing import Dict, List, Optional, Any
+import uuid
 from datetime import datetime
 
-from .models.event import Event
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from .models.event import Event, CondensationEvent
+from .condenser.condenser import Condenser
 
 class ConversationMemory:
     """
-    Conversation memory for storing and retrieving conversation events.
-    Provides thread-safe operations for concurrent access.
+    Manages the conversation memory for a session, including event tracking and condensation.
+    This is the first tier of the three-tier memory architecture.
     """
     
-    def __init__(self, storage_dir: str = "memory/conversations"):
+    def __init__(self, session_id: str, user_id: str, condensers: List[Condenser] = None):
         """
         Initialize conversation memory.
         
         Args:
-            storage_dir: Directory to store conversation data
+            session_id: Unique identifier for the session
+            user_id: Identifier for the user
+            condensers: List of condensers to apply to the event history
         """
-        self.storage_dir = storage_dir
-        self.events: Dict[str, List[Event]] = {}
-        self._lock = threading.Lock()
-        
-        # Create storage directory if it doesn't exist
-        os.makedirs(storage_dir, exist_ok=True)
-        logger.info(f"ConversationMemory initialized with storage directory: {storage_dir}")
+        self.session_id = session_id
+        self.user_id = user_id
+        self.events: List[Event] = []
+        self.condensers = condensers or []
+        self._condensed_events: Optional[List[Event]] = None
     
-    def add_event(self, session_id: str, event: Event) -> None:
+    def add_event(self, event: Event) -> None:
         """
-        Add an event to the conversation memory.
+        Add an event to the conversation history.
         
         Args:
-            session_id: Session ID
-            event: Event to add
+            event: The event to add
         """
-        with self._lock:
-            if session_id not in self.events:
-                self.events[session_id] = []
-            
-            self.events[session_id].append(event)
-            logger.debug(f"Added event to session {session_id}: {event.id}")
+        self.events.append(event)
+        self._condensed_events = None  # Reset condensed events cache
+        self._apply_condensers()
     
-    def add_events(self, session_id: str, events: List[Event]) -> None:
-        """
-        Add multiple events to the conversation memory.
-        
-        Args:
-            session_id: Session ID
-            events: Events to add
-        """
-        with self._lock:
-            if session_id not in self.events:
-                self.events[session_id] = []
+    def _apply_condensers(self) -> None:
+        """Apply all condensers to the event history."""
+        if not self.condensers:
+            return
             
-            self.events[session_id].extend(events)
-            logger.debug(f"Added {len(events)} events to session {session_id}")
+        events = self.events.copy()
+        for condenser in self.condensers:
+            events = condenser.condense(events)
+        
+        self._condensed_events = events
     
-    def get_events(self, session_id: str, limit: Optional[int] = None) -> List[Event]:
+    def condensed_events(self) -> List[Event]:
         """
-        Get events for a session.
-        
-        Args:
-            session_id: Session ID
-            limit: Maximum number of events to return
-            
-        Returns:
-            List of events
-        """
-        with self._lock:
-            if session_id not in self.events:
-                return []
-            
-            events = self.events[session_id]
-            
-            if limit:
-                events = events[-limit:]
-            
-            return events
-    
-    def clear_events(self, session_id: str) -> None:
-        """
-        Clear events for a session.
-        
-        Args:
-            session_id: Session ID
-        """
-        with self._lock:
-            if session_id in self.events:
-                self.events[session_id] = []
-                logger.debug(f"Cleared events for session {session_id}")
-    
-    def save_events(self, session_id: str) -> bool:
-        """
-        Save events for a session to disk.
-        
-        Args:
-            session_id: Session ID
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        with self._lock:
-            if session_id not in self.events:
-                logger.warning(f"No events to save for session {session_id}")
-                return False
-            
-            session_dir = os.path.join(self.storage_dir, session_id)
-            os.makedirs(session_dir, exist_ok=True)
-            
-            try:
-                events_data = [event.to_dict() for event in self.events[session_id]]
-                
-                with open(os.path.join(session_dir, "events.json"), 'w') as f:
-                    json.dump(events_data, f, indent=2)
-                
-                logger.info(f"Saved {len(events_data)} events for session {session_id}")
-                return True
-            except Exception as e:
-                logger.error(f"Error saving events for session {session_id}: {e}")
-                return False
-    
-    def load_events(self, session_id: str) -> bool:
-        """
-        Load events for a session from disk.
-        
-        Args:
-            session_id: Session ID
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        session_dir = os.path.join(self.storage_dir, session_id)
-        
-        if not os.path.exists(session_dir):
-            logger.warning(f"No saved events found for session {session_id}")
-            return False
-        
-        events_path = os.path.join(session_dir, "events.json")
-        
-        if not os.path.exists(events_path):
-            logger.warning(f"No events file found for session {session_id}")
-            return False
-        
-        try:
-            with open(events_path, 'r') as f:
-                events_data = json.load(f)
-            
-            with self._lock:
-                self.events[session_id] = [Event.from_dict(data) for data in events_data]
-            
-            logger.info(f"Loaded {len(self.events[session_id])} events for session {session_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Error loading events for session {session_id}: {e}")
-            return False
-    
-    def get_session_ids(self) -> List[str]:
-        """
-        Get all session IDs.
+        Get the condensed event history.
         
         Returns:
-            List of session IDs
+            List of events after applying condensers
         """
-        with self._lock:
-            return list(self.events.keys())
+        if self._condensed_events is None:
+            self._apply_condensers()
+        
+        return self._condensed_events or self.events
     
-    def delete_session(self, session_id: str) -> bool:
+    def to_messages(self) -> List[Dict[str, Any]]:
         """
-        Delete a session.
+        Convert the condensed event history to a list of messages for the LLM.
+        
+        Returns:
+            List of messages in the format expected by the LLM
+        """
+        messages = []
+        for event in self.condensed_events():
+            # Check if the event has a to_message method
+            if hasattr(event, 'to_message') and callable(event.to_message):
+                message = event.to_message()
+                if message:
+                    messages.append(message)
+        
+        return messages
+    
+    def clear(self) -> None:
+        """Clear all events from the conversation memory."""
+        self.events = []
+        self._condensed_events = None
+    
+    def create_condensation_event(self, content: str, event_ids: List[str]) -> CondensationEvent:
+        """
+        Create a condensation event summarizing multiple events.
         
         Args:
-            session_id: Session ID
+            content: The condensed content
+            event_ids: IDs of the events being condensed
             
         Returns:
-            True if successful, False otherwise
+            A new CondensationEvent
         """
-        session_dir = os.path.join(self.storage_dir, session_id)
+        return CondensationEvent(
+            id=str(uuid.uuid4()),
+            timestamp=datetime.now(),
+            user_id=self.user_id,
+            session_id=self.session_id,
+            content=content,
+            original_event_ids=event_ids
+        )
+    
+    def get_events_by_domain(self, domain: str) -> List[Event]:
+        """
+        Get events filtered by domain.
         
-        if not os.path.exists(session_dir):
-            logger.warning(f"No saved events found for session {session_id}")
-            return False
+        Args:
+            domain: The domain to filter by
+            
+        Returns:
+            List of events in the specified domain
+        """
+        return [
+            event for event in self.events 
+            if hasattr(event, 'domain') and getattr(event, 'domain') == domain
+        ]
+    
+    def get_recent_events(self, count: int = 10) -> List[Event]:
+        """
+        Get the most recent events.
         
-        try:
-            import shutil
-            shutil.rmtree(session_dir)
+        Args:
+            count: Number of events to return
             
-            with self._lock:
-                if session_id in self.events:
-                    del self.events[session_id]
-            
-            logger.info(f"Deleted session {session_id}")
-            return True
-        except Exception as e:
-            logger.error(f"Error deleting session {session_id}: {e}")
-            return False
+        Returns:
+            List of the most recent events
+        """
+        return self.events[-count:] if self.events else []

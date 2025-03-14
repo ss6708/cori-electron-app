@@ -18,6 +18,23 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 from backend.core.state_management import AgentStateController, AgentState
 from backend.core.event_system import event_bus, Event as CoreEvent
 
+# Import Memory Event classes
+from backend.memory.models.event import (
+    Event as MemoryEvent,
+    UserMessageEvent as MemoryUserMessageEvent,
+    AssistantMessageEvent as MemoryAssistantMessageEvent,
+    SystemMessageEvent as MemorySystemMessageEvent,
+    CondensationEvent as MemoryCondensationEvent
+)
+
+# Import RAG++ Event classes
+from backend.memory.models.rag.event import (
+    Event as RAGEvent,
+    UserMessageEvent,
+    AssistantMessageEvent,
+    SystemMessageEvent
+)
+
 # Import RAG++ classes
 from backend.memory.adapters.server_integration import RAGServerIntegration
 
