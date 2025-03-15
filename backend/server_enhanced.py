@@ -73,12 +73,25 @@ def open_spreadsheet():
         if system == "Windows":
             # Windows: Use Excel
             import win32com.client
+            import pythoncom
+            
+            # Initialize COM for the current thread
+            pythoncom.CoInitialize()
+            
+            # Create Excel application instance
             excel_app = win32com.client.Dispatch("Excel.Application")
             excel_app.Visible = True
-            # Open an existing workbook
-            dir_path = Path("C:\\Users\\shrey\\OneDrive\\Desktop\\Excel\\inputs")
-            ws_path = "Sample model.xlsm"
-            workbook = excel_app.Workbooks.Open(os.path.join(dir_path, ws_path))
+            
+            # Open an existing workbook if path is specified, otherwise create a new one
+            try:
+                dir_path = Path("C:\\Users\\shrey\\OneDrive\\Desktop\\Excel\\inputs")
+                ws_path = "Sample model.xlsm"
+                workbook = excel_app.Workbooks.Open(os.path.join(dir_path, ws_path))
+            except Exception as e:
+                # Fallback to creating a new workbook if opening fails
+                logger.warning(f"Failed to open specified workbook: {e}. Creating a new workbook instead.")
+                workbook = excel_app.Workbooks.Add()
+            
             return {"message": "Excel opened successfully"}
             
         elif system == "Linux":
@@ -102,25 +115,28 @@ def open_spreadsheet():
             # Wait for LibreOffice to start
             time.sleep(2)
             
-            # Connect to LibreOffice via UNO bridge
-            import uno
-            localContext = uno.getComponentContext()
-            resolver = localContext.ServiceManager.createInstanceWithContext(
-                "com.sun.star.bridge.UnoUrlResolver", localContext)
-            
-            # Connect to the running LibreOffice instance
-            context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext")
-            desktop = context.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", context)
-            
-            # Create a new Calc document
-            libreoffice_calc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())
-            
-            return {"message": "LibreOffice Calc opened successfully"}
+            try:
+                # Connect to LibreOffice via UNO bridge
+                import uno
+                localContext = uno.getComponentContext()
+                resolver = localContext.ServiceManager.createInstanceWithContext(
+                    "com.sun.star.bridge.UnoUrlResolver", localContext)
+                
+                # Connect to the running LibreOffice instance
+                context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext")
+                desktop = context.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", context)
+                
+                # Create a new Calc document
+                libreoffice_calc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())
+                
+                return {"message": "LibreOffice Calc opened successfully"}
+            except ImportError:
+                return {"error": "python3-uno module not installed. Please install python3-uno."}
         else:
             return {"error": f"Unsupported operating system: {system}"}
             
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Error opening spreadsheet: {str(e)}"}
 
 @app.route('/open-excel', methods=['GET'])
 def launch_spreadsheet():
