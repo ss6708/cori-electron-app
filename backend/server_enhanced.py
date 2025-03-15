@@ -60,6 +60,9 @@ rag_handler = rag_integration.get_rag_handler()
 excel_app = None
 libreoffice_calc = None
 
+# Import Excel thread manager for Windows
+from excel_thread_manager import excel_manager
+
 def open_spreadsheet():
     """
     Open Excel on Windows or LibreOffice Calc on Linux.
@@ -71,28 +74,27 @@ def open_spreadsheet():
         system = platform.system()
         
         if system == "Windows":
-            # Windows: Use Excel
-            import win32com.client
-            import pythoncom
+            # Windows: Use Excel in a dedicated thread with proper COM initialization
+            logger.info("Opening Excel spreadsheet in dedicated thread")
             
-            # Initialize COM for the current thread
-            pythoncom.CoInitialize()
-            
-            # Create Excel application instance
-            excel_app = win32com.client.Dispatch("Excel.Application")
-            excel_app.Visible = True
-            
-            # Open an existing workbook if path is specified, otherwise create a new one
+            # Define the path to the Excel file
             try:
-                dir_path = Path("C:\\Users\\shrey\\OneDrive\\Desktop\\Excel\\inputs")
-                ws_path = "Sample model.xlsm"
-                workbook = excel_app.Workbooks.Open(os.path.join(dir_path, ws_path))
+                file_path = os.path.join(
+                    Path("C:\\Users\\shrey\\OneDrive\\Desktop\\Excel\\inputs"),
+                    "Sample model.xlsm"
+                )
             except Exception as e:
-                # Fallback to creating a new workbook if opening fails
-                logger.warning(f"Failed to open specified workbook: {e}. Creating a new workbook instead.")
-                workbook = excel_app.Workbooks.Add()
+                logger.warning(f"Error constructing file path: {e}")
+                file_path = None
             
-            return {"message": "Excel opened successfully"}
+            # Open spreadsheet in dedicated thread with proper COM initialization
+            success, message = excel_manager.open_spreadsheet(file_path)
+            
+            if success:
+                return {"message": "Excel opened successfully"}
+            else:
+                logger.error(f"Failed to open Excel: {message}")
+                return {"error": message}
             
         elif system == "Linux":
             # Linux: Use LibreOffice Calc
@@ -136,6 +138,7 @@ def open_spreadsheet():
             return {"error": f"Unsupported operating system: {system}"}
             
     except Exception as e:
+        logger.error(f"Error opening spreadsheet: {str(e)}")
         return {"error": f"Error opening spreadsheet: {str(e)}"}
 
 @app.route('/open-excel', methods=['GET'])
@@ -163,53 +166,17 @@ def capture_spreadsheet_screenshot():
         system = platform.system()
         
         if system == "Windows":
-            # Windows: Capture Excel window
-            if not excel_app:
-                return None, "Excel application not running"
-                
-            # Windows screenshot code
-            import win32gui
-            import win32ui
-            import win32con
-            from PIL import Image
+            # Windows: Capture Excel window using the dedicated thread manager
+            logger.info("Capturing Excel screenshot in dedicated thread")
             
-            # Find Excel window handle
-            hwnd = win32gui.FindWindow(None, excel_app.Caption)
-            if not hwnd:
-                return None, "Excel window not found"
+            # Capture screenshot in dedicated thread with proper COM initialization
+            success, result = excel_manager.capture_screenshot()
             
-            # Get window dimensions
-            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-            width = right - left
-            height = bottom - top
-            
-            # Create device context
-            hwnd_dc = win32gui.GetWindowDC(hwnd)
-            mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
-            save_dc = mfc_dc.CreateCompatibleDC()
-            
-            # Create bitmap
-            save_bitmap = win32ui.CreateBitmap()
-            save_bitmap.CreateCompatibleBitmap(mfc_dc, width, height)
-            save_dc.SelectObject(save_bitmap)
-            
-            # Copy screen to bitmap
-            save_dc.BitBlt((0, 0), (width, height), mfc_dc, (0, 0), win32con.SRCCOPY)
-            
-            # Convert bitmap to image
-            bmpinfo = save_bitmap.GetInfo()
-            bmpstr = save_bitmap.GetBitmapBits(True)
-            img = Image.frombuffer(
-                'RGB',
-                (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-                bmpstr, 'raw', 'BGRX', 0, 1
-            )
-            
-            # Clean up
-            win32gui.DeleteObject(save_bitmap.GetHandle())
-            save_dc.DeleteDC()
-            mfc_dc.DeleteDC()
-            win32gui.ReleaseDC(hwnd, hwnd_dc)
+            if success:
+                return result, None
+            else:
+                logger.error(f"Failed to capture Excel screenshot: {result}")
+                return None, result
             
         elif system == "Linux":
             # Linux: Capture LibreOffice Calc window
