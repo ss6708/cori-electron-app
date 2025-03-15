@@ -12,6 +12,7 @@ from datetime import datetime
 from flask_cors import CORS
 from dotenv import load_dotenv
 import uuid
+from pathlib import Path
 
 # Import core classes
 from ai_services.openai_handler import OpenAIHandler
@@ -59,6 +60,17 @@ rag_handler = rag_integration.get_rag_handler()
 excel_app = None
 libreoffice_calc = None
 
+# Import Excel thread manager for Windows
+from excel_thread_manager import excel_manager
+
+# Initialize Excel thread manager for Windows
+if platform.system() == "Windows":
+    try:
+        excel_manager.start()
+        logger.info("Excel thread manager started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start Excel thread manager: {e}")
+
 def open_spreadsheet():
     """
     Open Excel on Windows or LibreOffice Calc on Linux.
@@ -70,11 +82,27 @@ def open_spreadsheet():
         system = platform.system()
         
         if system == "Windows":
-            # Windows: Use Excel
-            import win32com.client
-            excel_app = win32com.client.Dispatch("Excel.Application")
-            excel_app.Visible = True
-            return {"message": "Excel opened successfully"}
+            # Windows: Use Excel in a dedicated thread with proper COM initialization
+            logger.info("Opening Excel spreadsheet in dedicated thread")
+            
+            # Define the path to the Excel file
+            try:
+                file_path = os.path.join(
+                    Path("C:\\Users\\shrey\\OneDrive\\Desktop\\Excel\\inputs"),
+                    "Sample model.xlsm"
+                )
+            except Exception as e:
+                logger.warning(f"Error constructing file path: {e}")
+                file_path = None
+            
+            # Open spreadsheet in dedicated thread with proper COM initialization
+            success, message = excel_manager.open_spreadsheet(file_path)
+            
+            if success:
+                return {"message": "Excel opened successfully"}
+            else:
+                logger.error(f"Failed to open Excel: {message}")
+                return {"error": message}
             
         elif system == "Linux":
             # Linux: Use LibreOffice Calc
@@ -97,25 +125,29 @@ def open_spreadsheet():
             # Wait for LibreOffice to start
             time.sleep(2)
             
-            # Connect to LibreOffice via UNO bridge
-            import uno
-            localContext = uno.getComponentContext()
-            resolver = localContext.ServiceManager.createInstanceWithContext(
-                "com.sun.star.bridge.UnoUrlResolver", localContext)
-            
-            # Connect to the running LibreOffice instance
-            context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext")
-            desktop = context.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", context)
-            
-            # Create a new Calc document
-            libreoffice_calc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())
-            
-            return {"message": "LibreOffice Calc opened successfully"}
+            try:
+                # Connect to LibreOffice via UNO bridge
+                import uno
+                localContext = uno.getComponentContext()
+                resolver = localContext.ServiceManager.createInstanceWithContext(
+                    "com.sun.star.bridge.UnoUrlResolver", localContext)
+                
+                # Connect to the running LibreOffice instance
+                context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext")
+                desktop = context.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", context)
+                
+                # Create a new Calc document
+                libreoffice_calc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())
+                
+                return {"message": "LibreOffice Calc opened successfully"}
+            except ImportError:
+                return {"error": "python3-uno module not installed. Please install python3-uno."}
         else:
             return {"error": f"Unsupported operating system: {system}"}
             
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Error opening spreadsheet: {str(e)}")
+        return {"error": f"Error opening spreadsheet: {str(e)}"}
 
 @app.route('/open-excel', methods=['GET'])
 def launch_spreadsheet():
@@ -142,53 +174,17 @@ def capture_spreadsheet_screenshot():
         system = platform.system()
         
         if system == "Windows":
-            # Windows: Capture Excel window
-            if not excel_app:
-                return None, "Excel application not running"
-                
-            # Windows screenshot code
-            import win32gui
-            import win32ui
-            import win32con
-            from PIL import Image
+            # Windows: Capture Excel window using the dedicated thread manager
+            logger.info("Capturing Excel screenshot in dedicated thread")
             
-            # Find Excel window handle
-            hwnd = win32gui.FindWindow(None, excel_app.Caption)
-            if not hwnd:
-                return None, "Excel window not found"
+            # Capture screenshot in dedicated thread with proper COM initialization
+            success, result = excel_manager.capture_screenshot()
             
-            # Get window dimensions
-            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-            width = right - left
-            height = bottom - top
-            
-            # Create device context
-            hwnd_dc = win32gui.GetWindowDC(hwnd)
-            mfc_dc = win32ui.CreateDCFromHandle(hwnd_dc)
-            save_dc = mfc_dc.CreateCompatibleDC()
-            
-            # Create bitmap
-            save_bitmap = win32ui.CreateBitmap()
-            save_bitmap.CreateCompatibleBitmap(mfc_dc, width, height)
-            save_dc.SelectObject(save_bitmap)
-            
-            # Copy screen to bitmap
-            save_dc.BitBlt((0, 0), (width, height), mfc_dc, (0, 0), win32con.SRCCOPY)
-            
-            # Convert bitmap to image
-            bmpinfo = save_bitmap.GetInfo()
-            bmpstr = save_bitmap.GetBitmapBits(True)
-            img = Image.frombuffer(
-                'RGB',
-                (bmpinfo['bmWidth'], bmpinfo['bmHeight']),
-                bmpstr, 'raw', 'BGRX', 0, 1
-            )
-            
-            # Clean up
-            win32gui.DeleteObject(save_bitmap.GetHandle())
-            save_dc.DeleteDC()
-            mfc_dc.DeleteDC()
-            win32gui.ReleaseDC(hwnd, hwnd_dc)
+            if success:
+                return result, None
+            else:
+                logger.error(f"Failed to capture Excel screenshot: {result}")
+                return None, result
             
         elif system == "Linux":
             # Linux: Capture LibreOffice Calc window
@@ -601,6 +597,19 @@ def condense_memory(session_id):
         logger.error(error_message)
         
         return jsonify({"error": str(e)}), 500
+
+# Register shutdown handler to stop Excel thread manager
+import atexit
+
+@atexit.register
+def shutdown():
+    """Clean up resources when the server exits."""
+    if platform.system() == "Windows":
+        try:
+            excel_manager.stop()
+            logger.info("Excel thread manager stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping Excel thread manager: {e}")
 
 if __name__ == '__main__':
     # Use 0.0.0.0 to allow connections from any IP address

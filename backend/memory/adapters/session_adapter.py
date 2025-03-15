@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 
 # Import core classes
-from backend.core.session_persistence import session_manager, SessionManager
+from backend.core.session_persistence import SessionManager
 from backend.core.state_management import AgentStateController, AgentState
 from backend.models.message import Message as CoreMessage
 
@@ -33,7 +33,7 @@ class SessionAdapter:
     Thread-safe for concurrent operations.
     """
     
-    def __init__(self, session_manager: SessionManager = session_manager, 
+    def __init__(self, session_manager: Optional[SessionManager] = None, 
                 conversation_memory: Optional[ConversationMemory] = None):
         """
         Initialize the session adapter.
@@ -42,7 +42,7 @@ class SessionAdapter:
             session_manager: Core SessionManager instance
             conversation_memory: RAG++ ConversationMemory instance
         """
-        self.session_manager = session_manager
+        self.session_manager = session_manager or SessionManager()
         self.conversation_memory = conversation_memory or ConversationMemory()
         self.message_adapter = MessageAdapter()
         self._lock = threading.Lock()
@@ -102,9 +102,9 @@ class SessionAdapter:
             
             # Save to core SessionManager
             core_saved = self.session_manager.save_session(
+                session_id=session_id,
                 messages=messages,
-                state_controller=state_controller,
-                additional_data=additional_data
+                state_controller=state_controller
             )
             
             success = rag_saved and core_saved
