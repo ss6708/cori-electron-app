@@ -63,6 +63,14 @@ libreoffice_calc = None
 # Import Excel thread manager for Windows
 from excel_thread_manager import excel_manager
 
+# Initialize Excel thread manager for Windows
+if platform.system() == "Windows":
+    try:
+        excel_manager.start()
+        logger.info("Excel thread manager started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start Excel thread manager: {e}")
+
 def open_spreadsheet():
     """
     Open Excel on Windows or LibreOffice Calc on Linux.
@@ -589,6 +597,19 @@ def condense_memory(session_id):
         logger.error(error_message)
         
         return jsonify({"error": str(e)}), 500
+
+# Register shutdown handler to stop Excel thread manager
+import atexit
+
+@atexit.register
+def shutdown():
+    """Clean up resources when the server exits."""
+    if platform.system() == "Windows":
+        try:
+            excel_manager.stop()
+            logger.info("Excel thread manager stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping Excel thread manager: {e}")
 
 if __name__ == '__main__':
     # Use 0.0.0.0 to allow connections from any IP address
