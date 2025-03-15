@@ -23,7 +23,7 @@ from .knowledge.financial_domain_detector import FinancialDomainDetector
 # Set up logging
 logger = logging.getLogger(__name__)
 
-class RAGEnhancedOpenAI:
+class RAGEnhancedOpenAIHandler:
     """
     RAG-enhanced OpenAI integration for Cori's three-tier memory architecture.
     This class provides enhanced OpenAI API integration with RAG capabilities.
