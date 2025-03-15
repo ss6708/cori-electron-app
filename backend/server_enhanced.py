@@ -12,6 +12,7 @@ from datetime import datetime
 from flask_cors import CORS
 from dotenv import load_dotenv
 import uuid
+from pathlib import Path
 
 # Import core classes
 from ai_services.openai_handler import OpenAIHandler
@@ -74,6 +75,10 @@ def open_spreadsheet():
             import win32com.client
             excel_app = win32com.client.Dispatch("Excel.Application")
             excel_app.Visible = True
+            # Open an existing workbook
+            dir_path = Path("C:\\Users\\shrey\\OneDrive\\Desktop\\Excel\\inputs")
+            ws_path = "Sample model.xlsm"
+            workbook = excel_app.Workbooks.Open(os.path.join(dir_path, ws_path))
             return {"message": "Excel opened successfully"}
             
         elif system == "Linux":
