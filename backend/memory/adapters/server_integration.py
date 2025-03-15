@@ -170,9 +170,8 @@ class RAGServerIntegration:
         )
         
         # Initialize session adapter
-        from backend.core.session_persistence import session_manager
+        from backend.core.session_persistence import SessionManager
         self.session_adapter = SessionAdapter(
-            session_manager=session_manager,
             conversation_memory=self.conversation_memory
         )
     
