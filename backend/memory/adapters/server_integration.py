@@ -135,9 +135,15 @@ class RAGServerIntegration:
             storage_dir=os.path.join(self.storage_dir, "conversations")
         )
         
-        # Initialize knowledge base
+        # Initialize long-term memory first (before knowledge base)
+        self.long_term_memory = LongTermMemory(
+            storage_dir=os.path.join(self.storage_dir, "long_term")
+        )
+        
+        # Initialize knowledge base with long_term_memory
         self.knowledge_base = FinancialKnowledgeBase(
-            storage_dir=os.path.join(self.storage_dir, "knowledge")
+            long_term_memory=self.long_term_memory,
+            knowledge_dir=os.path.join(self.storage_dir, "knowledge")
         )
         
         # Initialize domain detector
@@ -148,11 +154,6 @@ class RAGServerIntegration:
         # Initialize knowledge retriever
         self.knowledge_retriever = KnowledgeRetriever(
             financial_knowledge_base=self.knowledge_base
-        )
-        
-        # Initialize long-term memory
-        self.long_term_memory = LongTermMemory(
-            storage_dir=os.path.join(self.storage_dir, "long_term")
         )
         
         # Initialize user preference store
