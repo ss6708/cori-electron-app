@@ -49,8 +49,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
     "concurrently": "^9.1.2",
-    "date-fns": "^4.1.0",
-    "electron-builder": "^25.1.8",
+    "date-fns": "^4.1.0",    
     "embla-carousel-react": "^8.5.1",
     "flask-cors": "^0.0.1",
     "input-otp": "^1.4.2",
@@ -85,6 +84,7 @@
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "electron-builder": "^25.1.8"
   }
 }
